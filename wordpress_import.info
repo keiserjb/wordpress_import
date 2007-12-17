@@ -1,0 +1,5 @@
+; $Id$
+name = Wordpress import
+description = "Import WXR files created by Wordpress blog tool."
+package = "Importing"
+dependencies = taxonomy path comment
