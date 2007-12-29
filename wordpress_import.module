@@ -373,6 +373,18 @@ function wordpress_import_post($post, $params)
   {
     $drupal_categories['tags'][$params['tags_vocabulary']] = join(',', $drupal_tags);
   }
+  
+  // Defining status
+  
+  switch (wordpress_import_get_tag($post,'wp:status'))
+  {
+    case 'draft':
+    case 'private':
+      $status = FALSE;
+    break;
+    default:
+      $status = TRUE;
+  } 
 
   // Inserting node
 
@@ -383,7 +395,7 @@ function wordpress_import_post($post, $params)
     'title' => html_entity_decode(wordpress_import_get_tag($post,'title'), ENT_COMPAT, 'UTF-8'),
     'body' => wordpress_import_get_tag($post,'content:encoded'),
     'format' => $params['format'],
-    'status' => 1,
+    'status' => $status,
     'promote' => $promote,
     'created' => strtotime(wordpress_import_get_tag($post,'wp:post_date')),
     'comment' => wordpress_import_get_tag($post,'wp:comment_status')=='open'?COMMENT_NODE_READ_WRITE:COMMENT_NODE_READ_ONLY,
