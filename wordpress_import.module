@@ -210,7 +210,6 @@ function wordpress_import_home()
 
 function wordpress_import_import_blog($params)
 {
-  print_r($params);
   $wordpress = wordpress_import_items($params['file_path']);
   $params = array_merge($params,  wordpress_import_import_categories($wordpress));
   $params['tags_vocabulary'] = wordpress_import_create_tags_vocabulary();
