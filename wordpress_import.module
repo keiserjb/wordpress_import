@@ -752,7 +752,7 @@ function wordpress_import_form_subtask_finish(&$form_state) {
 
   // Prepare images directory
   if ($wordpress_import->options['images'] && !empty($wordpress_import->options['images_dir'])) {
-    file_check_directory($wordpress_import->options['images_dir'], TRUE);
+    file_prepare_directory($wordpress_import->options['images_dir'], TRUE);
   }
 
   // Prepare batch operations
@@ -1592,7 +1592,7 @@ function wordpress_import_create_vocabulary($type, $vocabulary_data) {
  * Return an array of taxonomy terms belonging to a vocabulary
  */
 function wordpress_import_get_terms($vid) {
-  $db_result = db_query("SELECT t.tid, t.* FROM {term_data} t WHERE t.vid = %d", $vid);
+  $db_result = db_query("SELECT t.tid, t.* FROM {taxonomy_term_data} t WHERE t.vocabulary = @d", array('@d' => $vid));
 
   $result = array();
   while ($term = db_fetch_object($db_result)) {
