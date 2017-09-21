@@ -833,10 +833,12 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
   if (!$context['sandbox']['format_done']) {
     $wordpress_import->format = variable_get('wordpress_import_format_id', 0);
     if (!$wordpress_import->format || !filter_formats($wordpress_import->format)) {
+      /*
       db_query("INSERT INTO {filter_formats} (name,cache) VALUES ('@s',1)", array('@s' => 'Wordpress format'));
       $wordpress_import->format = db_result(db_query("SELECT MAX(format) AS format FROM {filter_formats}"));
       db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (@d1, '@s', @d2, @d3)", array('@d1' => $wordpress_import->format, '@s' => 'filter', '@d2' => 2, '@d3' => 0));
       variable_set('wordpress_import_format_id', $wordpress_import->format);
+      */
     }
     $context['sandbox']['format_done'] = TRUE;
   }
