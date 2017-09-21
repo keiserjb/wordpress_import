@@ -896,18 +896,18 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
 
       // Create term if it doesn't exist
       if (empty($wordpress_import->categories_map[$category['cat_name']])) {
-        $term = array(
-          'name' => $category['cat_name'],
-          'description' => $category['category_description'],
-          'vid' => $wordpress_import->categories_vocabulary,
+        $term = new TaxonomyTerm();
+        $term->name = $category['cat_name'],
+        $term->description = $category['category_description'],
+        $term->vocabulary = $wordpress_import->categories_vocabulary,
           );
 
         if (!empty($category['category_parent']) && !empty($wordpress_import->categories_map[$category['category_parent']])) {
-          $term['parent'] = $wordpress_import->categories_map[$category['category_parent']];
+          $term->parent = $wordpress_import->categories_map[$category['category_parent']];
         }
 
         taxonomy_term_save($term);
-        $wordpress_import->categories_map[$category['cat_name']] = $term['tid'];
+        $wordpress_import->categories_map[$category['cat_name']] = $term->id;
 
         $context['results']['created_terms']++;
       }
