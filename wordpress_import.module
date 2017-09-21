@@ -1081,13 +1081,15 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   $node['format'] = $wordpress_import->format;
 
   // Node teaser
+  // Node teaser does not5 exist any more
+  /*
   if (empty($post['excerpt'])) {
-    $node['teaser'] = node_teaser($node['body'], $node['format']);
+    $node['teaser'] = text_summary($node['body'], $node['format']);
   }
   else {
     $node['teaser'] = $post['excerpt'];
   }
-
+  */
   // Node language
   $node['language'] = (isset($wordpress_import->options['language']) ? $wordpress_import->options['language'] : '');
 
