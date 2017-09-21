@@ -1,0 +1,11 @@
+name = Wordpress import
+description = "Import WXR files created by Wordpress blog tool."
+package = "Importing"
+dependencies[] = form_wizard
+
+; Information added by drupal.org packaging script on 2013-10-26
+version = "1.x-1.x-dev"
+backdrop = "1.x"
+; project = "wordpress_import"
+; datestamp = "1382797132"
+
