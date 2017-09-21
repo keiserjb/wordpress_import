@@ -906,7 +906,7 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
           $term['parent'] = $wordpress_import->categories_map[$category['category_parent']];
         }
 
-        taxonomy_save_term($term);
+        taxonomy_term_save($term);
         $wordpress_import->categories_map[$category['cat_name']] = $term['tid'];
 
         $context['results']['created_terms']++;
@@ -1595,7 +1595,7 @@ function wordpress_import_get_terms($vid) {
   $db_result = db_query("SELECT t.tid, t.* FROM {taxonomy_term_data} t WHERE t.vocabulary = @d", array('@d' => $vid));
 
   $result = array();
-  while ($term = db_fetch_object($db_result)) {
+  foreach ($db_result as $term) {
     $result[$term->name] = $term->tid;
   }
 
