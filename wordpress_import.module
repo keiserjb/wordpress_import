@@ -1138,8 +1138,15 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
   */
 
-  if (has_node_duplicate($node)) {
-
+  $node_exist = has_node_duplicate($node);
+  if ($node_exist) {
+    // load the node and add the comments
+    $temp_node = node_load($node_exist);
+    if (module_exists('comment') && !empty($post['comments'])) {
+      wordpress_import_process_post_comments($post['comments'], $context['sandbox']['node_duplicate']->nid, $wordpress_import->options['disable_trackbacks'], $context);
+    }
+    node_save($temp_node);
+    return;
   }
 
   // Process link for this post
@@ -1678,7 +1685,13 @@ function has_node_duplicate($node) {
   $query->fieldCondition('created', $node->created, '=');
   $query->fieldCondition('type', $node->type, '=');
 
-  $id = $query->execute();
+  $ids = $query->execute();
 
-  return (!empty($id));
+  if (isset($ids['node'])) {
+    $ids = array_keys($ids['node']);
+    $id = array_shift($ids);
+    return $id;
+  }
+
+  return FALSE;
 }
