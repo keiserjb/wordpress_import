@@ -1045,11 +1045,11 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   // Node type
   switch ($post['type']) {
     case 'post' :
-      $node['type'] = $wordpress_import->options['nodetype_post'];
+      $node->type = $wordpress_import->options['nodetype_post'];
       $node_og = $wordpress_import->options['nodetype_post_og'];
       break;
     case 'page' :
-      $node['type'] = $wordpress_import->options['nodetype_page'];
+      $node->type = $wordpress_import->options['nodetype_page'];
       $node_og = $wordpress_import->options['nodetype_page_og'];
       break;
     default :
@@ -1057,29 +1057,29 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
 
   // Catch noimport content type flag
-  if ($node['type'] == 'noimport') {
+  if ($node->type == 'noimport') {
     return;
   }
 
   // Node uid (return if we don't want this author)
-  $node['uid'] = $wordpress_import->usermap[$post['author']];
-  if ($node['uid'] == 'noimport' || !ctype_digit($node['uid'])) {
+  $node->uid = $wordpress_import->usermap[$post['author']];
+  if ($node->uid == 'noimport' || !ctype_digit($node['uid'])) {
     return;
   }
 
   // Node title
   if (!empty($post['title'])) {
-    $node['title'] = html_entity_decode($post['title'], ENT_COMPAT, 'UTF-8');
+    $node->title = html_entity_decode($post['title'], ENT_COMPAT, 'UTF-8');
   }
   else {
-    $node['title'] = t('Untitled');
+    $node->title = t('Untitled');
   }
 
   // Node content
-  $node['body'] = str_replace('<!--more-->', '<!--break-->', $post['content']);
+  $node->body = str_replace('<!--more-->', '<!--break-->', $post['content']);
 
   // Node format
-  $node['format'] = $wordpress_import->format;
+  $node->format = $wordpress_import->format;
 
   // Node teaser
   // Node teaser does not exist any more
@@ -1092,40 +1092,41 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
   */
   // Node language
-  $node['language'] = (isset($wordpress_import->options['language']) ? $wordpress_import->options['language'] : '');
+  $node->language = (isset($wordpress_import->options['language']) ? $wordpress_import->options['language'] : '');
 
   // Node timestamp
-  $node['created'] = strtotime($post['date']);
-  $node['changed'] = $node['created'];
+  $node->created = strtotime($post['date']);
+  $node->changed = $node->created;
 
   // Node status
   switch ($post['status']) {
     case 'publish':
       if (empty($post['post_password'])) {
-        $node['status'] = 1;
+        $node->status = 1;
       }
       else {
-        $node['status'] = 0;
+        $node->status = 0;
         $context['results']['password_protected']++;
       }
       break;
     default:
-      $node['status'] = 0;
+      $node->status = 0;
   }
 
   // Node promote
   switch ($post['is_sticky']) {
     case '1':
-      $node['promote'] = 1;
+      $node->promote = 1;
       break;
     default:
-      $node['promote'] = 0;
+      $node->promote = 0;
   }
 
   // Node comment status
-  $node['comment'] = $post['comment_status']=='open'?COMMENT_NODE_READ_WRITE:COMMENT_NODE_READ_ONLY;
+  $node->comment = $post['comment_status']=='open'?COMMENT_NODE_READ_WRITE:COMMENT_NODE_READ_ONLY;
 
   // Check if node wasn't already imported
+  /*
   $context['sandbox']['node_duplicate'] = node_load(array('created' => $node['created'], 'title' => $node['title'], 'type' => $node['type']));
   if ($context['sandbox']['node_duplicate']->nid) {
     if (module_exists('comment') && !empty($post['comments'])) {
@@ -1134,6 +1135,11 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     unset($context['sandbox']['node_duplicate']);
     unset($context['sandbox']['post']);
     return;
+  }
+  */
+
+  if (has_node_duplicate($node)) {
+
   }
 
   // Process link for this post
@@ -1155,7 +1161,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
 
   // Save the node
-  $node = (object)$node;
+  // $node = (object)$node;
   node_save($node);
 
   // Process comments and trackbacks for this post
@@ -1655,4 +1661,24 @@ function curl_redir_url($ch) {
 
 function file_directory_path() {
   return variable_get('file_public_path', conf_path() . '/files');
+}
+
+
+/**
+ * Helper function to find duplicate nodes
+ *
+ * @param node $node the node to search for
+ *
+ * @return mixed FALSE if node is not found, nid otherwise.
+ */
+function has_node_duplicate($node) {
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'node');
+  $query->fieldCondition('title', $node->title, '=');
+  $query->fieldCondition('created', $node->created, '=');
+  $query->fieldCondition('type', $node->type, '=');
+
+  $id = $query->execute();
+
+  return (!empty($id));
 }
