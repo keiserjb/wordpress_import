@@ -938,7 +938,7 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
         $term->vocabulary = $wordpress_import->tags_vocabulary;
 
         taxonomy_term_save($term);
-        $wordpress_import->tags_map[$tag] = $term->id;
+        $wordpress_import->tags_map[$tag] = $term->tid;
 
         $context['results']['created_terms']++;
       }
@@ -1063,7 +1063,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // Node uid (return if we don't want this author)
   $node->uid = $wordpress_import->usermap[$post['author']];
-  if ($node->uid == 'noimport' || !ctype_digit($node['uid'])) {
+  if ($node->uid == 'noimport' || !ctype_digit($node->uid)) {
     return;
   }
 
@@ -1075,24 +1075,18 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     $node->title = t('Untitled');
   }
 
+  // we need the language here
+  $node_language = (isset($wordpress_import->options['language']) ? $wordpress_import->options['language'] : LANGUAGE_NONE);
+
   // Node content
-  $node->body = str_replace('<!--more-->', '<!--break-->', $post['content']);
-
-  // Node format
-  $node->format = $wordpress_import->format;
-
-  // Node teaser
-  // Node teaser does not exist any more
-  /*
-  if (empty($post['excerpt'])) {
-    $node['teaser'] = text_summary($node['body'], $node['format']);
+  $node->body[$node_language][0]['value'] = str_replace('<!--more-->', '<!--break-->', $post['content']);
+  $node->body[$node_language][0]['format'] = 'full_html';
+  if (!empty($post['excerpt'])) {
+    $node->body[$node_language][0]['summary'] = $post['excerpt'];
   }
-  else {
-    $node['teaser'] = $post['excerpt'];
-  }
-  */
+
   // Node language
-  $node->language = (isset($wordpress_import->options['language']) ? $wordpress_import->options['language'] : '');
+  $node->language = $node_language;
 
   // Node timestamp
   $node->created = strtotime($post['date']);
@@ -1123,7 +1117,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
 
   // Node comment status
-  $node->comment = $post['comment_status']=='open'?COMMENT_NODE_READ_WRITE:COMMENT_NODE_READ_ONLY;
+  $node->comment = $post['comment_status']=='open'? '2' : '0' ;
 
   // Check if node wasn't already imported
   /*
@@ -1151,10 +1145,16 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // Process link for this post
   if (module_exists('path') && $wordpress_import->options['aliases']) {
-    $node->path = wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']);
-    if (module_exists('pathauto')) {
-      $node->pathauto_perform_alias = 0;
-    }
+    // $node->path = wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']);
+
+    // switch to drupal 7 / backdrop path
+    $path = array (
+      'alias' => wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']),
+      'langcode' => $node->language,
+      'auto' => FALSE,
+    );
+
+    $node->path = $path;
   }
 
   // Process categories and tags for this post
@@ -1166,7 +1166,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // Process images for this post
   if ($wordpress_import->options['images']) {
-    wordpress_import_process_post_images($node['body'], $wordpress_import->options['images_dir'], $context);
+    wordpress_import_process_post_images($node->body, $wordpress_import->options['images_dir'], $context);
   }
 
   // Save the node
@@ -1286,6 +1286,7 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
           $node_trackback = array(
             'nid' => $nid,
             'created' => strtotime($comment['date']),
+            'changed' => strtotime($comment['date']),
             'site' => $comment['author_IP'],
             'name' => decode_entities(strip_tags($comment['author'])),
             'subject' => trim(truncate_utf8(decode_entities(strip_tags($comment['content'])), 29, TRUE)),
@@ -1306,28 +1307,32 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
         }
         break;
       default:
-        $node_comment = array(
+        $nc = array(
           'nid' => $nid,
           'pid' => 0,
-          'comment' => $comment['content'],
           'subject' => trim(truncate_utf8(decode_entities(strip_tags($comment['content'])), 29, TRUE)),
-          'name' => decode_entities(strip_tags($comment['author'])),
+          'name' => decode_entities(strip_tags(substr($comment['author'], 0, 60))),
           'mail' => $comment['author_email'],
           'homepage' => $comment['author_url'],
-          'timestamp' => strtotime($comment['date']),
+          'created' => strtotime($comment['date']),
+          'changed' => strtotime($comment['date']),
           'hostname' => $comment['author_IP'],
           'status' => $status,
-          'format' => $wordpress_import->format
-          );
+          'format' => $wordpress_import->format,
+        );
+
+        $node_comment = entity_create('comment', $nc);
+        $node_comment->comment_body[LANGUAGE_NONE][0]['value'] = $comment['content'];
+
         // Check if duplicate
         if ($node_duplicate) {
           $c = db_query("SELECT c.cid, c.comment FROM {comments} c WHERE c.nid = %d AND c.timestamp = %d", $node_duplicate->nid, $node_comment['timestamp']);
-          if ($c->cid && $c->comment == $node_comment['comment']) {
+          if ($c->cid && $c->comment == $node_comment['comment_body']) {
             continue 2;
           }
         }
         else {
-          $node_comments[$node_comment['timestamp']] = $node_comment;
+          $node_comments[$node_comment->created] = $node_comment;
         }
         break;
     }
@@ -1356,11 +1361,12 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
   foreach ($node_comments as $node_comment) {
     $comment_id = comment_save($node_comment);
     // Update fields that haven't been set by comment_save
-    db_query("UPDATE {comments} SET hostname= '%s', timestamp= %d, status= %d WHERE cid= %d",
-      $node_comment['hostname'],
-      $node_comment['timestamp'],
-      $node_comment['status'],
-      $comment_id
+    db_query("UPDATE {comment} SET hostname= '@hn', created= @ts, status= @st WHERE cid= @id", array(
+      '@hn' => $node_comment->hostname,
+      '@ts' => $node_comment->timestamp,
+      '@st' => $node_comment->status,
+      '@id' => $comment_id
+      )
       );
     $context['results']['created_comments']++;
   }
@@ -1683,9 +1689,9 @@ function file_directory_path() {
 function has_node_duplicate($node) {
   $query = new EntityFieldQuery();
   $query->entityCondition('entity_type', 'node');
-  $query->fieldCondition('title', $node->title, '=');
-  $query->fieldCondition('created', $node->created, '=');
-  $query->fieldCondition('type', $node->type, '=');
+  $query->propertyCondition('title', $node->title, '=');
+  $query->propertyCondition('created', $node->created, '=');
+  $query->propertyCondition('type', $node->type, '=');
 
   $ids = $query->execute();
 
