@@ -171,6 +171,11 @@ function wordpress_import_wizard() {
 
   $form_state['wordpress_import_obj'] = $wordpress_import;
 
+  // Skip taxonomy mapping form if taxonomy import is deselected
+  if ($step == 'taxonomy' && !!$wordpress_import->options['disable_categories']) {
+    backdrop_goto('admin/content/wordpress_import/og');
+  }
+
   // Skip OG step if module isn't present, or if node content type isn't an OG-enabled
   if ($step == 'og' && (!module_exists('og') || !($wordpress_import->options['nodetype_post_og'] || $wordpress_import->options['nodetype_page_og']))) {
     backdrop_goto('admin/content/wordpress_import/mapusers');
