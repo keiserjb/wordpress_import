@@ -81,7 +81,7 @@ function wordpress_import_home() {
 
   // XMLReader is required
   if (!extension_loaded('xmlreader')) {
-    drupal_set_message(t('<strong>XMLReader PHP extension not found!</strong>  The XMLReader extension is available in PECL as of PHP 5.0.0 and is included and enabled as of PHP 5.1.0 by default. It can be enabled by adding the argument --enable-xmlreader  (or --with-xmlreader before 5.1.0) to your configure line. The libxml  extension is required. '), 'error');
+    backdrop_set_message(t('<strong>XMLReader PHP extension not found!</strong>  The XMLReader extension is available in PECL as of PHP 5.0.0 and is included and enabled as of PHP 5.1.0 by default. It can be enabled by adding the argument --enable-xmlreader  (or --with-xmlreader before 5.1.0) to your configure line. The libxml  extension is required. '), 'error');
     return '';
   }
 
@@ -157,12 +157,12 @@ function wordpress_import_wizard() {
   // $wordpress_import = NULL;
 
   if (!$wordpress_import && $step != '') {
-    drupal_goto('admin/content/wordpress_import');
+    backdrop_goto('admin/content/wordpress_import');
     return;
   }
 
   if (!$wordpress_import) {
-    drupal_set_message($step);
+    backdrop_set_message($step);
     $step = current(array_keys($form_info['order']));
     $wordpress_import = new stdClass();
     // ctools_object_cache_set('wordpress_import', $form_state['cache name'], $wordpress_import);
@@ -173,12 +173,12 @@ function wordpress_import_wizard() {
 
   // Skip OG step if module isn't present, or if node content type isn't an OG-enabled
   if ($step == 'og' && (!module_exists('og') || !($wordpress_import->options['nodetype_post_og'] || $wordpress_import->options['nodetype_page_og']))) {
-    drupal_goto('admin/content/wordpress_import/mapusers');
+    backdrop_goto('admin/content/wordpress_import/mapusers');
   }
 
   // Skip users creation step if no new users
   if ($step == 'newusers' && !array_search('newuser', $wordpress_import->usermap)) {
-    drupal_goto('admin/content/wordpress_import/ready');
+    backdrop_goto('admin/content/wordpress_import/ready');
   }
 
   // $output = ctools_wizard_multistep_form($form_info, $step, $form_state);
@@ -237,7 +237,7 @@ function wordpress_import_form_file($form, &$form_state) {
   // Create and scan module directory
   // $wordpress_import_path = file_create_path('wordpress');
   // $wordpress_import_path = drupal_mkdir('public://wordpress');
-  $wordpress_import_path = drupal_realpath('public://wordpress');
+  $wordpress_import_path = backdrop_realpath('public://wordpress');
   file_prepare_directory($wordpress_import_path);
   // $files = file_scan_directory($wordpress_import_path, '.*\.xml');/.*.png$/i
   $files = file_scan_directory($wordpress_import_path, '/.*.xml$/i');
@@ -283,7 +283,7 @@ function wordpress_import_form_file_validate(&$form, &$form_state) {
     $filepath = $upload->filepath;
   }
   else {
-    $filepath = drupal_realpath('public://wordpress') . '/' . $form_state['values']['local'];
+    $filepath = backdrop_realpath('public://wordpress') . '/' . $form_state['values']['local'];
   }
 
   // Make sure a file was uploaded or a local file was selected
@@ -306,7 +306,7 @@ function wordpress_import_form_file_submit(&$form, &$form_state) {
   (!empty($form_state['values']['upload'])) ? ($filesource = t('uploaded')) : ($filesource = t('local'));
   $fileinfo = pathinfo($form_state['wordpress_import_obj']->filepath);
 
-  drupal_set_message(t('Successfully loaded @filesource file "@filename".', array('@filesource' => $filesource, '@filename' => $fileinfo['basename'])));
+  backdrop_set_message(t('Successfully loaded @filesource file "@filename".', array('@filesource' => $filesource, '@filename' => $fileinfo['basename'])));
 
   $message = t('The following elements were identified :');
 
@@ -317,7 +317,7 @@ function wordpress_import_form_file_submit(&$form, &$form_state) {
   $msg_found[] = '<li>' . t('@found_categories categories', array('@found_categories' => $form_state['wordpress_import_obj']->count['categories'])) . '</li>';
   $msg_found[] = '<li>' . t('@found_tags tags', array('@found_tags' => $form_state['wordpress_import_obj']->count['tags'])) . '</li>';
 
-  drupal_set_message($message . '<ul>' . join("\n", $msg_found) . '</ul>');
+  backdrop_set_message($message . '<ul>' . join("\n", $msg_found) . '</ul>');
 /*
   if (function_exists('dpm')) {
     dpm($form_state['wordpress_import_obj']->data);
@@ -439,30 +439,30 @@ function wordpress_import_form_options($form, &$form_state) {
 
   // Warn if some key modules are not found
   if (!module_exists('taxonomy')) {
-      drupal_set_message(t('Could not find module "path". <strong>Categories and tags will not be imported.</strong>'), 'error');
+      backdrop_set_message(t('Could not find module "path". <strong>Categories and tags will not be imported.</strong>'), 'error');
       $form['advanced_options']['disable_categories']['#default_value'] = TRUE;
       $form['advanced_options']['disable_categories']['#disabled'] = TRUE;
       $form['advanced_options']['#collapsed'] = FALSE;
   }
   if (!module_exists('comment')) {
-      drupal_set_message(t('Could not find module "comment". <strong>Comments and tackbacks will not be imported.</strong>'), 'error');
+      backdrop_set_message(t('Could not find module "comment". <strong>Comments and tackbacks will not be imported.</strong>'), 'error');
       $form['advanced_options']['disable_comments']['#default_value'] = TRUE;
       $form['advanced_options']['disable_comments']['#disabled'] = TRUE;
       $form['advanced_options']['#collapsed'] = FALSE;
   }
   if (!module_exists('trackback')) {
-      drupal_set_message(t('Could not find module "trackback". <strong>Trackbacks will not be imported.</strong>'), 'error');
+      backdrop_set_message(t('Could not find module "trackback". <strong>Trackbacks will not be imported.</strong>'), 'error');
       $form['advanced_options']['disable_trackbacks']['#default_value'] = TRUE;
       $form['advanced_options']['disable_trackbacks']['#disabled'] = TRUE;
       $form['advanced_options']['#collapsed'] = FALSE;
   }
   if (!module_exists('path')) {
-      drupal_set_message(t('Could not find module "path". Create paths option disabled.'), 'warning');
+      backdrop_set_message(t('Could not find module "path". Create paths option disabled.'), 'warning');
       $form['advanced_options']['aliases']['#default_value'] = FALSE;
       $form['advanced_options']['aliases']['#disabled'] = TRUE;
   }
   if (!extension_loaded('curl')) {
-      drupal_set_message(t('cURL PHP extension not available. Transfer images option disabled.'), 'warning');
+      backdrop_set_message(t('cURL PHP extension not available. Transfer images option disabled.'), 'warning');
       $form['advanced_options']['images']['#default_value'] = FALSE;
       $form['advanced_options']['images']['#disabled'] = TRUE;
   }
@@ -508,7 +508,7 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
 function wordpress_import_form_options_submit(&$form, &$form_state) {
 
   // Clear messages
-  drupal_get_messages();
+  backdrop_get_messages();
 
   $form_state['values']['advanced_options']['images_dir'] = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
 
@@ -658,30 +658,27 @@ function wordpress_import_form_mapusers($form, &$form_state) {
   $result =  db_query($sql);
   $found_users = $result->fetchAllAssoc('uid');
 
-  foreach ($found_users as $drupal_user) {
-    if ($drupal_user->uid != 0) {
-      $drupal_users[$drupal_user->uid] = $drupal_user->name;
+  foreach ($found_users as $backdrop_user) {
+    if ($backdrop_user->uid != 0) {
+      $backdrop_users[$backdrop_user->uid] = $backdrop_user->name;
     }
   }
 
-  // convert to drupal 7 database api
-
-
   if ($wordpress_import->options['usermap_type'] == 'default') {
 
-    $drupal_users = array('newuser' => t('Create new user')) + $drupal_users;
+    $backdrop_users = array('newuser' => t('Create new user')) + $backdrop_users;
 
     $form['defaultuser'] = array(
       '#type' => 'select',
       '#title' => t('Default user'),
       '#description' => t('Map all Wordpress authors to one single Drupal user.'),
-      '#options' => $drupal_users,
+      '#options' => $backdrop_users,
     );
 
   }
   else {
 
-    $drupal_users = array('newuser' => t('Create new user'), 'noimport' => t('Do not import')) + $drupal_users;
+    $backdrop_users = array('newuser' => t('Create new user'), 'noimport' => t('Do not import')) + $backdrop_users;
 
     $form['usermap'] = array(
       '#title' => t('Users mapping'),
@@ -691,11 +688,11 @@ function wordpress_import_form_mapusers($form, &$form_state) {
       '#tree' => TRUE
     );
 
-    foreach ($wordpress_import ->usermap as $wp_user => $drupal_user) {
+    foreach ($wordpress_import ->usermap as $wp_user => $backdrop_user) {
       $form['usermap'][$wp_user] = array(
         '#type' => 'select',
         '#title' => $wp_user . ' (' . $wordpress_import->count['author_posts'][$wp_user] . ')',
-        '#options' => $drupal_users,
+        '#options' => $backdrop_users,
       );
     }
   }
@@ -713,8 +710,8 @@ function wordpress_import_form_mapusers_validate(&$form, &$form_state) {
   // Make sure there is something to import
   if (count($form_state['values']['usermap']) > 0) {
     $i = FALSE;
-    foreach ($form_state['values']['usermap'] as $wp_user => $drupal_user) {
-      if ($drupal_user != 'noimport') {
+    foreach ($form_state['values']['usermap'] as $wp_user => $backdrop_user) {
+      if ($backdrop_user != 'noimport') {
         $i = TRUE;
         break;
       }
@@ -840,8 +837,8 @@ function wordpress_import_form_subtask_cancel(&$form_state) {
   // ctools_object_cache_clear('wordpress_import', $form_state['cache name']);
   wordpress_import_form_clear_page_cache($form_state['cache name']);
   $form_state['redirect'] = 'admin/content/wordpress_import';
-  drupal_get_messages();
-  drupal_set_message('Import operation cancelled.');
+  backdrop_get_messages();
+  backdrop_set_message('Import operation cancelled.');
 }
 
 
@@ -1585,7 +1582,7 @@ function wordpress_import_batch_finished($success, $results, $operations) {
     $msg_results[] = '<li>' . t('@created_trackbacks trackbacks', array('@created_trackbacks' => $results['created_trackbacks'])) . '</li>';
     $msg_results[] = '<li>' . t('@downloaded_images/@total_images images', array('@downloaded_images' => count($results['downloaded_images']), '@total_images' => count($results['downloaded_images'])+count($results['error_images']))) . '</li>';
 
-    drupal_set_message($message . '<ul>' . join("\n", $msg_results) . '</ul>');
+    backdrop_set_message($message . '<ul>' . join("\n", $msg_results) . '</ul>');
 
     if (function_exists('dpm')) {
       // dpm($results['error_images']);
@@ -1597,17 +1594,17 @@ function wordpress_import_batch_finished($success, $results, $operations) {
       foreach ($results['error_images'] as $error_image) {
         $errors .= '<li>' . l($error_image['title'], 'node/' . $error_image['nid']) . "</li>\n";
       }
-      drupal_set_message(t('Some images could not be transferred for these nodes :') . '<ul>' . $errors . '</ul>', 'warning');
+      backdrop_set_message(t('Some images could not be transferred for these nodes :') . '<ul>' . $errors . '</ul>', 'warning');
     }
 
     if ($results['password_protected'] > 0) {
-      drupal_set_message(t('Encountered @password_protected password-protected posts. These were imported as unpublished nodes.', array('@password_protected' => $results['password_protected'])), 'warning');
+      backdrop_set_message(t('Encountered @password_protected password-protected posts. These were imported as unpublished nodes.', array('@password_protected' => $results['password_protected'])), 'warning');
     }
 
   }
   else {
 
-    drupal_set_message(t('Import failed.'), 'error');
+    backdrop_set_message(t('Import failed.'), 'error');
 
   }
 
