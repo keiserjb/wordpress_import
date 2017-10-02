@@ -115,6 +115,7 @@ function wordpress_import_wizard() {
     'order' => array(
       'file' => t('Source file'),
       'options' => t('Options'),
+      'taxonomy' => t('Map taxonomies'),
       'og' => t('Organic groups'),
       'mapusers' => t('Map users'),
       'newusers' => t('New users'),
@@ -127,6 +128,9 @@ function wordpress_import_wizard() {
       ),
       'options' => array(
         'form id' => 'wordpress_import_form_options'
+      ),
+      'taxonomy' => array(
+        'form id' => 'wordpress_import_form_map_taxonomies'
       ),
       'og' => array(
         'form id' => 'wordpress_import_form_og'
@@ -357,11 +361,16 @@ function wordpress_import_form_options($form, &$form_state) {
 
   if (module_exists('locale')) {
     $default = language_default();
+    $options = array('' => t('Language neutral'));
+    $language_list = language_list();
+    foreach ($language_list as $value) {
+      $options[$value->langcode] = $value->name;
+    }
     $form['basic_options']['language'] = array(
       '#type' => 'select',
       '#title' => t('Language'),
-      '#default_value' => $default->language,
-      '#options' => array('' => t('Language neutral')) + locale_language_list('name'),
+      '#default_value' => $default->langcode,
+      '#options' => $options,
     );
   }
 
@@ -518,6 +527,96 @@ function wordpress_import_form_options_submit(&$form, &$form_state) {
 }
 
 
+function wordpress_import_form_map_taxonomies($form, &$form_state) {
+  $wordpress_import = &$form_state['wordpress_import_obj'];
+
+  // get the node types
+  $nodetype_post = $wordpress_import->options['nodetype_post'];
+  $nodetype_page = $wordpress_import->options['nodetype_page'];
+
+  // get the fields of the node type
+  $nodetype_post_fields = field_info_instances('node', $nodetype_post);
+  $nodetype_page_fields = field_info_instances('node', $nodetype_page);
+
+  // find the taxonomy-fields
+  $nodetype_post_taxonomy = array('noimport' => 'Do not import');
+  $nodetype_page_taxonomy = array('noimport' => 'Do not import');
+
+
+  foreach ($nodetype_post_fields as $field_name => $value) {
+    $field_info = field_info_field($field_name);
+    if (isset($field_info['type']) && ($field_info['type'] == 'taxonomy_term_reference')) {
+      $nodetype_post_taxonomy[$field_name] = $value['label'];
+    }
+  }
+/*
+  foreach ($nodetype_page_fields as $field_name => $value) {
+    $field_info = field_info_field($field_name);
+    if (isset($field_info['type']) && ($field_info['type'] == 'taxonomy_term_reference')) {
+      $nodetype_page_taxonomy[$field_name] = $value['label'];
+    }
+  }
+*/
+  $form['post_taxonomy_category'] = array(
+    '#type' => 'select',
+    '#title' => t('Import Category to vocabulary'),
+    '#description' => t('All categories will be assigned to that vocabulary'),
+    '#default_value' => 'noimport',
+    '#options' => $nodetype_post_taxonomy,
+  );
+
+  $form['post_taxonomy_tags'] = array(
+    '#type' => 'select',
+    '#title' => t('Import Tags to vocabulary'),
+    '#description' => t('All categories will be assigned to that vocabulary'),
+    '#default_value' => 'noimport',
+    '#options' => $nodetype_post_taxonomy,
+  );
+/*
+  $form['page_taxonomy_category'] = array(
+    '#type' => 'select',
+    '#title' => t('Import Category to vocabulary'),
+    '#description' => t('All categories will be assigned to that vocabulary'),
+    '#default_value' => 'noimport',
+    '#options' => $nodetype_page_taxonomy,
+  );
+
+  $form['page_taxonomy_tags'] = array(
+    '#type' => 'select',
+    '#title' => t('Import Tags to vocabulary'),
+    '#description' => t('All categories will be assigned to that vocabulary'),
+    '#default_value' => 'noimport',
+    '#options' => $nodetype_page_taxonomy,
+  );
+*/
+  return $form;
+}
+
+function wordpress_import_form_map_taxonomies_submit(&$form, &$form_state) {
+
+  $form_state['wordpress_import_obj']->options['nodetype_post_tm']['category_fieldname'] = $form_state['values']['post_taxonomy_category'];
+  $form_state['wordpress_import_obj']->options['nodetype_post_tm']['tag_fieldname'] = $form_state['values']['post_taxonomy_tags'];
+
+  // we additionally need to add the vocabulary name here
+  $fn = $form_state['values']['post_taxonomy_category'];
+  if ($fn != 'noimport') {
+    $fi = field_info_field($fn);
+    $form_state['wordpress_import_obj']->options['nodetype_post_tm']['category_vocabulary'] = $fi['settings']['allowed_values'][0]['vocabulary'];
+  }
+
+  $fn = $form_state['values']['post_taxonomy_tags'];
+  if ($fn != 'noimport') {
+    $fi = field_info_field($fn);
+    $form_state['wordpress_import_obj']->options['nodetype_post_tm']['tag_vocabulary'] = $fi['settings']['allowed_values'][0]['vocabulary'];
+  }
+
+  /*
+  $form_state['wordpress_import_obj']->options['nodetype_page_tm']['category_fieldname'] = $form_state['values']['page_taxonomy_category'];
+  $form_state['wordpress_import_obj']->options['nodetype_page_tm']['tag_fieldname'] = $form_state['values']['page_taxonomy_tags'];
+  */
+}
+
+
 function wordpress_import_form_og($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
@@ -564,7 +663,7 @@ function wordpress_import_form_mapusers($form, &$form_state) {
       $drupal_users[$drupal_user->uid] = $drupal_user->name;
     }
   }
-dpm($drupal_users);
+
   // convert to drupal 7 database api
 
 
@@ -884,15 +983,9 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
 
   if (!empty($wordpress_import->data['categories'])) {
 
-    $category_vocabulary_data = array(
-      'name' => t('Wordpress category'),
-      'module' => 'wordpress_import',
-      'multiple' => 1,
-      'nodes' => array($wordpress_import->options['nodetype'] => $wordpress_import->options['nodetype'])
-    );
-
-    $wordpress_import->categories_vocabulary = wordpress_import_create_vocabulary('category', $category_vocabulary_data);
-    $wordpress_import->categories_map = wordpress_import_get_terms($wordpress_import->categories_vocabulary);
+    // $wordpress_import->categories_vocabulary = wordpress_import_create_vocabulary('category', $category_vocabulary_data);
+    $wordpress_import->categories_vocabulary = $wordpress_import->options['nodetype_post_tm']['category_vocabulary'];
+    $wordpress_import->categories_map = wordpress_import_get_terms($wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
 
     foreach ($wordpress_import->data['categories'] as $category) {
 
@@ -901,14 +994,24 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
         $term = new TaxonomyTerm();
         $term->name = $category['cat_name'];
         $term->description = $category['category_description'];
-        $term->vocabulary = $wordpress_import->categories_vocabulary;
+        $term->vocabulary = $wordpress_import->options['nodetype_post_tm']['category_vocabulary'];
+        $term->parent = 0;
 
         if (!empty($category['category_parent']) && !empty($wordpress_import->categories_map[$category['category_parent']])) {
           $term->parent = $wordpress_import->categories_map[$category['category_parent']];
         }
 
         taxonomy_term_save($term);
-        $wordpress_import->categories_map[$category['cat_name']] = $term->id;
+
+        // we need to insert the parent to the table manually
+        db_insert('taxonomy_term_hierarchy')
+          ->fields(array(
+            'tid' => $term->tid,
+            'parent' => $term->parent,
+            ))
+          ->execute();
+
+        $wordpress_import->categories_map[$category['cat_name']] = $term->tid;
 
         $context['results']['created_terms']++;
       }
@@ -917,16 +1020,8 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
 
   if (!empty($wordpress_import->data['tags'])) {
 
-    $tag_vocabulary_data = array(
-      'name' => t('Wordpress tag'),
-      'module' => 'wordpress_import',
-      'tags' => 1,
-      'multiple' => 1,
-      'nodes' => array($wordpress_import->options['nodetype'] => $wordpress_import->options['nodetype'])
-    );
-
-    $wordpress_import->tags_vocabulary = wordpress_import_create_vocabulary('tag', $tag_vocabulary_data);
-    $wordpress_import->tags_map = wordpress_import_get_terms($wordpress_import->tags_vocabulary);
+    $wordpress_import->tags_vocabulary = $wordpress_import->options['nodetype_post_tm']['tag_vocabulary'];
+    $wordpress_import->tags_map = wordpress_import_get_terms($wordpress_import->options['nodetype_post_tm']['tag_vocabulary']);
 
     foreach ($wordpress_import->data['tags'] as $tag => $description) {
 
@@ -936,8 +1031,19 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
         $term->name = $tag;
         $term->description = $description;
         $term->vocabulary = $wordpress_import->tags_vocabulary;
+        $term->parent = 0;
 
         taxonomy_term_save($term);
+
+        // we need to insert the parent to the table manually
+        db_insert('taxonomy_term_hierarchy')
+          ->fields(array(
+            'tid' => $term->tid,
+            'parent' => '0',
+            ))
+          ->execute();
+
+
         $wordpress_import->tags_map[$tag] = $term->tid;
 
         $context['results']['created_terms']++;
@@ -1012,7 +1118,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
               $reader->read();
               $post['categories'][] = $reader->value;
             }
-            elseif ($reader->getAttribute('domain') == 'tag') {
+            elseif ($reader->getAttribute('domain') == 'post_tag') {
               $reader->read();
               $post['tags'][] = $reader->value;
             }
@@ -1038,23 +1144,25 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
 
   // Node object setup ---------------------- //
-  // $node = array();
-  $node = new Node();
+  // $node = new Node();
+  $node = array();
   $node_og = FALSE;
 
   // Node type
   switch ($post['type']) {
     case 'post' :
-      $node->type = $wordpress_import->options['nodetype_post'];
+      $node['type'] = $wordpress_import->options['nodetype_post'];
       $node_og = $wordpress_import->options['nodetype_post_og'];
       break;
     case 'page' :
-      $node->type = $wordpress_import->options['nodetype_page'];
+      $node['type'] = $wordpress_import->options['nodetype_page'];
       $node_og = $wordpress_import->options['nodetype_page_og'];
       break;
     default :
       return;
   }
+
+  $node = entity_create('node', $node);
 
   // Catch noimport content type flag
   if ($node->type == 'noimport') {
@@ -1078,11 +1186,13 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   // we need the language here
   $node_language = (isset($wordpress_import->options['language']) ? $wordpress_import->options['language'] : LANGUAGE_NONE);
 
+  $node->langcode = $node_language;
+
   // Node content
-  $node->body[$node_language][0]['value'] = str_replace('<!--more-->', '<!--break-->', $post['content']);
-  $node->body[$node_language][0]['format'] = 'full_html';
+  $node->body[LANGUAGE_NONE][0]['value'] = str_replace('<!--more-->', '<!--break-->', $post['content']);
+  $node->body[LANGUAGE_NONE][0]['format'] = 'full_html';
   if (!empty($post['excerpt'])) {
-    $node->body[$node_language][0]['summary'] = $post['excerpt'];
+    $node->body[LANGUAGE_NONE][0]['summary'] = $post['excerpt'];
   }
 
   // Node language
@@ -1120,18 +1230,6 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   $node->comment = $post['comment_status']=='open'? '2' : '0' ;
 
   // Check if node wasn't already imported
-  /*
-  $context['sandbox']['node_duplicate'] = node_load(array('created' => $node['created'], 'title' => $node['title'], 'type' => $node['type']));
-  if ($context['sandbox']['node_duplicate']->nid) {
-    if (module_exists('comment') && !empty($post['comments'])) {
-      wordpress_import_process_post_comments($post['comments'], $context['sandbox']['node_duplicate']->nid, $wordpress_import->options['disable_trackbacks'], $context);
-    }
-    unset($context['sandbox']['node_duplicate']);
-    unset($context['sandbox']['post']);
-    return;
-  }
-  */
-
   $node_exist = has_node_duplicate($node);
   if ($node_exist) {
     // load the node and add the comments
@@ -1145,8 +1243,6 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // Process link for this post
   if (module_exists('path') && $wordpress_import->options['aliases']) {
-    // $node->path = wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']);
-
     // switch to drupal 7 / backdrop path
     $path = array (
       'alias' => wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']),
@@ -1158,11 +1254,44 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
 
   // Process categories and tags for this post
-  /*
   if (module_exists('taxonomy') && !(empty($post['categories']) && empty($post['tags']))) {
-    $node['taxonomy'] = wordpress_import_process_post_categories_tags($post['categories'], $wordpress_import->categories_vocabulary, $wordpress_import->categories_map, $post['tags'], $wordpress_import->tags_vocabulary);
+    // $node['taxonomy'] = wordpress_import_process_post_categories_tags($post['categories'], $wordpress_import->categories_vocabulary, $wordpress_import->categories_map, $post['tags'], $wordpress_import->tags_vocabulary);
   }
-  */
+
+  if (module_exists('taxonomy')) {
+    // @todo: find out, why categories_map and tags_map dissapear from $wordpress_import
+    if ($node->type == $wordpress_import->options['nodetype_post']) {
+      if ($wordpress_import->options['nodetype_post_tm']['category_fieldname'] != 'noimport') {
+        // get the category term id and add it to the node
+        if (!empty($post['categories'])) {
+          foreach ($post['categories'] as $key => $value) {
+            $tid = get_term_id($value, $wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
+            if ($tid) {
+              $field_name = $wordpress_import->options['nodetype_post_tm']['category_fieldname'];
+              $field = $node->$field_name;
+              // $field[LANGUAGE_NONE][]['tid'] = $wordpress_import->categories_map[$value];
+              $field[LANGUAGE_NONE][]['tid'] = $tid;
+              $node->$field_name = $field;
+            }
+          }
+        }
+      }
+      if ($wordpress_import->options['nodetype_post_tm']['tag_fieldname'] != 'noimport') {
+        if (!empty($post['tags'])) {
+          foreach ($post['tags'] as $key => $value) {
+            $tid = get_term_id($value, $wordpress_import->options['nodetype_post_tm']['tag_vocabulary']);
+            if ($tid) {
+              $field_name = $wordpress_import->options['nodetype_post_tm']['tag_fieldname'];
+              $field = $node->$field_name;
+              // $field[LANGUAGE_NONE][]['tid'] = $wordpress_import->tags_map[$value];
+              $field[LANGUAGE_NONE][]['tid'] = $tid;
+              $node->$field_name = $field;
+            }
+          }
+        }
+      }
+    }
+  }
 
   // Process images for this post
   if ($wordpress_import->options['images']) {
@@ -1170,7 +1299,6 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
 
   // Save the node
-  // $node = (object)$node;
   node_save($node);
 
   // Process comments and trackbacks for this post
@@ -1460,7 +1588,7 @@ function wordpress_import_batch_finished($success, $results, $operations) {
     drupal_set_message($message . '<ul>' . join("\n", $msg_results) . '</ul>');
 
     if (function_exists('dpm')) {
-      dpm($results['error_images']);
+      // dpm($results['error_images']);
     }
 
     if (count($results['error_images']) > 0) {
@@ -1616,7 +1744,7 @@ function wordpress_import_create_vocabulary($type, $vocabulary_data) {
  * Return an array of taxonomy terms belonging to a vocabulary
  */
 function wordpress_import_get_terms($vid) {
-  $db_result = db_query("SELECT t.tid, t.* FROM {taxonomy_term_data} t WHERE t.vocabulary = @d", array('@d' => $vid));
+  $db_result = db_query('SELECT t.tid, t.name FROM {taxonomy_term_data} t WHERE t.vocabulary = :vid', array(':vid' => $vid))->fetchAll();
 
   $result = array();
   foreach ($db_result as $term) {
@@ -1702,4 +1830,18 @@ function has_node_duplicate($node) {
   }
 
   return FALSE;
+}
+
+
+/**
+ * Helper function to find term id for a name
+ *
+ * @param string $$name the node to search for
+ *
+ * @return mixed FALSE if name is not found, tid otherwise.
+ */
+function get_term_id($name, $vid) {
+  $result = db_query('SELECT t.tid FROM {taxonomy_term_data} t WHERE t.name = :name AND t.vocabulary = :vocab', array(':name' => $name, ':vocab' => $vid))->fetchAll();
+
+  return empty($result) ? FALSE : $result[0]->tid;
 }
