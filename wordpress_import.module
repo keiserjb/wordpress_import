@@ -1220,9 +1220,11 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   $node->langcode = $node_language;
 
+  $format = ($post['type'] == 'post') ? $wordpress_import->options['nodetype_post_format'] : $wordpress_import->options['nodetype_page_format'];
+
   // Node content
   $node->body[LANGUAGE_NONE][0]['value'] = str_replace('<!--more-->', '<!--break-->', $post['content']);
-  $node->body[LANGUAGE_NONE][0]['format'] = 'full_html';
+  $node->body[LANGUAGE_NONE][0]['format'] =  $format;
   if (!empty($post['excerpt'])) {
     $node->body[LANGUAGE_NONE][0]['summary'] = $post['excerpt'];
   }
