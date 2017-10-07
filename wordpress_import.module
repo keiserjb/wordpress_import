@@ -1226,10 +1226,6 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       return;
   }
 
-  if (isset($post['translations'])) {
-    dpm($post);
-  } 
-    
   $node = entity_create('node', $node);
 
   // Catch noimport content type flag
@@ -1375,6 +1371,35 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   if (module_exists('comment') && !empty($post['comments'])) {
     wordpress_import_process_post_comments($post['comments'], $node->nid, $wordpress_import->options['disable_trackbacks'], $context);
   }
+
+  // create the translated nodes
+  if (isset($post['translations'])) {
+    foreach ($post['translations'] as $key => $value) {
+      $tn = new Node();
+      $tn->type = $node->type;
+      $tn->langcode = $key;
+      $tn->title = $value['title'];
+      $tn->uid = $node->uid;
+      $tn->status = $node->status;
+      $tn->created = $node->created;
+      $tn->body[LANGUAGE_NONE][0]['value'] = str_replace('<!--more-->', '<!--break-->', $value['body']);
+      $tn->body[LANGUAGE_NONE][0]['format'] = $format;
+      $tn->comment = $node->comment;
+      $tn->promote = $node->promote;
+      $tn->sticky = $node->sticky;
+      $tn->tnid = $node->tnid;
+      if (isset($node->field_category)) {
+        $tn->field_category = $node->field_category;  
+      }
+      if (isset($node->field_tags)) {
+        $tn->field_tags = $node->field_tags;  
+      }      
+
+      if (has_node_duplicate($tn) === FALSE) {
+        node_save($tn);
+      }
+    }
+  } 
 
   // Node OG parameters
   if (module_exists('og') && $node_og) {
@@ -1890,6 +1915,7 @@ function has_node_duplicate($node) {
   $query->propertyCondition('title', $node->title, '=');
   $query->propertyCondition('created', $node->created, '=');
   $query->propertyCondition('type', $node->type, '=');
+  $query->propertyCondition('langcode', $node->langcode, '=');
 
   $ids = $query->execute();
 
