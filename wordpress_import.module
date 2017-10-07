@@ -1171,6 +1171,38 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
             }
           }
           break;
+
+        // get the translations as stored by Stella plugin
+        case 'wp:postmeta':
+          $reader->read();
+          $reader->read();
+          if ($reader->name == 'wp:meta_key') {
+            $reader->read();
+            if (strpos($reader->value, '_title') !== FALSE) {
+              // find the language
+              $components = explode('-', $reader->value);
+              if (isset($components[1])) {
+                $reader->read();
+                $reader->read();
+                $reader->read();
+                $reader->read(); 
+                $post['translations'][$components[1]]['title'] = $reader->value;
+              }
+            }
+            if (strpos($reader->value, '_body') !== FALSE) {
+              // find the language
+              $components = explode('-', $reader->value);
+              if (isset($components[1])) {
+                $reader->read();
+                $reader->read();
+                $reader->read();
+                $reader->read();
+                $post['translations'][$components[1]]['body'] = $reader->value;
+              }
+            }
+
+          }
+          break;
       }
     }
   }
@@ -1194,6 +1226,10 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       return;
   }
 
+  if (isset($post['translations'])) {
+    dpm($post);
+  } 
+    
   $node = entity_create('node', $node);
 
   // Catch noimport content type flag
