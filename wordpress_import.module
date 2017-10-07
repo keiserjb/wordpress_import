@@ -1296,6 +1296,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   $node->comment = $post['comment_status']=='open'? '2' : '0' ;
 
   // Check if node wasn't already imported
+  $temp_node = NULL;
   $node_exist = has_node_duplicate($node);
   if ($node_exist) {
     // load the node and add the comments
@@ -1374,6 +1375,12 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // create the translated nodes
   if (isset($post['translations'])) {
+
+    if ($temp_node != NULL) {
+      // node already exists, so switch 
+      $node = $temp_node;
+    }
+
     foreach ($post['translations'] as $key => $value) {
       $tn = new Node();
       $tn->type = $node->type;
@@ -1387,7 +1394,10 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       $tn->comment = $node->comment;
       $tn->promote = $node->promote;
       $tn->sticky = $node->sticky;
-      $tn->tnid = $node->tnid;
+      $tn->tnid = $node->nid;
+      $tn->path['alias'] = $node->path['alias'];
+      $tn->path['langcode'] = $key;
+      $tn->path['auto'] = FALSE;
       if (isset($node->field_category)) {
         $tn->field_category = $node->field_category;  
       }
@@ -1397,6 +1407,8 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
       if (has_node_duplicate($tn) === FALSE) {
         node_save($tn);
+        $context['results']['created_nodes']++;
+//        dpm($tn);
       }
     }
   } 
