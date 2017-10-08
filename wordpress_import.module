@@ -1320,11 +1320,6 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     $node->path = $path;
   }
 
-  // Process categories and tags for this post
-  if (module_exists('taxonomy') && !(empty($post['categories']) && empty($post['tags']))) {
-    // $node['taxonomy'] = wordpress_import_process_post_categories_tags($post['categories'], $wordpress_import->categories_vocabulary, $wordpress_import->categories_map, $post['tags'], $wordpress_import->tags_vocabulary);
-  }
-
   if (module_exists('taxonomy')) {
     // @todo: find out, why categories_map and tags_map dissapear from $wordpress_import
     if ($node->type == $wordpress_import->options['nodetype_post']) {
@@ -1408,7 +1403,10 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       if (has_node_duplicate($tn) === FALSE) {
         node_save($tn);
         $context['results']['created_nodes']++;
-//        dpm($tn);
+
+        // we need to set the tnid of the original node, too
+        $node->tnid = $node->nid;
+        node_save($node);
       }
     }
   } 
