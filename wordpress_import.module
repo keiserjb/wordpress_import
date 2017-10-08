@@ -1405,8 +1405,10 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
         $context['results']['created_nodes']++;
 
         // we need to set the tnid of the original node, too
-        $node->tnid = $node->nid;
-        node_save($node);
+        if ($node->tnid != $node->nid) {
+          $node->tnid = $node->nid;
+          node_save($node);          
+        }
       }
     }
   } 
