@@ -1415,9 +1415,11 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       $tn->promote = $node->promote;
       $tn->sticky = $node->sticky;
       $tn->tnid = $node->nid;
-      $tn->path['alias'] = $node->path['alias'];
+      if (!$wordpress_import->options['redirect']  && $wordpress_import->options['aliases']) {
+        $tn->path['alias'] = $node->path['alias'];
+        $tn->path['auto'] = FALSE;
+      }
       $tn->path['langcode'] = $key;
-      $tn->path['auto'] = FALSE;
       if (isset($node->field_category)) {
         $tn->field_category = $node->field_category;  
       }
@@ -1903,8 +1905,8 @@ function wordpress_import_get_terms($vid) {
 function wordpress_import_create_redirect($node, $path) {
   $redirect = new Redirect();
   $redirect->langcode = $node->langcode;
-  $redirect->source = 'node/' . $node->nid;
-  $redirect->redirect = $path;
+  $redirect->source = $path;
+  $redirect->redirect = 'node/' . $node->nid;;
 
   redirect_save($redirect);  
 }
