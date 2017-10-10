@@ -1331,11 +1331,13 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     return;
   }
 
+  $node_path = wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']);
+
   // Process link for this post
   if (module_exists('path') && $wordpress_import->options['aliases']) {
     // switch to drupal 7 / backdrop path
     $path = array (
-      'alias' => wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']),
+      'alias' => $node_path,
       'langcode' => $node->language,
       'auto' => FALSE,
     );
@@ -1427,6 +1429,12 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
         node_save($tn);
         $context['results']['created_nodes']++;
 
+        // Create redirect for the translated node
+        if (module_exists('redirect') && $wordpress_import->options['redirect']) {
+          wordpress_import_create_redirect($tn, $node_path);
+        }
+
+
         // we need to set the tnid of the original node, too
         if ($node->tnid != $node->nid) {
           $node->tnid = $node->nid;
@@ -1441,6 +1449,12 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     $node->og_groups = $wordpress_import->og_groups;
     $node->og_public = (int) $wordpress_import->og_public;
     og_save_ancestry($node);
+  }
+
+
+  // Create redirect for this node
+  if (module_exists('redirect') && $wordpress_import->options['redirect']) {
+    wordpress_import_create_redirect($node, $node_path);
   }
 
   // Update messages infos with nid
@@ -1883,6 +1897,18 @@ function wordpress_import_get_terms($vid) {
 
   return $result;
 }
+
+
+
+function wordpress_import_create_redirect($node, $path) {
+  $redirect = new Redirect();
+  $redirect->langcode = $node->langcode;
+  $redirect->source = 'node/' . $node->nid;
+  $redirect->redirect = $path;
+
+  redirect_save($redirect);  
+}
+
 
 /**
  * cURL helper function since PHP has disabled redirection support.
