@@ -450,6 +450,15 @@ function wordpress_import_form_options($form, &$form_state) {
     '#description' => t('Preserve the path of the original Wordpress posts and pages. For this to work properly, your Drupal site root must be the same as the Wordpress site (!root) and clean URLs should be activated', array('!root' => $wordpress_import->data['baseurl']))
   );
 
+  $form['advanced_options']['redirect'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Create URL redirect'),
+    '#default_value' => FALSE,
+    '#disabled' => FALSE,
+    '#description' => t('Create an redirect of the original Wordpress posts and pages URLs. For this to work properly, your Drupal site root must be the same as the Wordpress site (!root) and clean URLs should be activated', array('!root' => $wordpress_import->data['baseurl']))
+  );
+
+
   $form['advanced_options']['images'] = array(
     '#type' => 'checkbox',
     '#title' => t('Transfer images'),
@@ -488,6 +497,11 @@ function wordpress_import_form_options($form, &$form_state) {
       $form['advanced_options']['aliases']['#default_value'] = FALSE;
       $form['advanced_options']['aliases']['#disabled'] = TRUE;
   }
+  if (!module_exists('redirect')) {
+      backdrop_set_message(t('Could not find module "redirect". Create redirect option disabled.'), 'warning');
+      $form['advanced_options']['redirect']['#default_value'] = FALSE;
+      $form['advanced_options']['redirect']['#disabled'] = TRUE;
+  }
   if (!extension_loaded('curl')) {
       backdrop_set_message(t('cURL PHP extension not available. Transfer images option disabled.'), 'warning');
       $form['advanced_options']['images']['#default_value'] = FALSE;
@@ -524,6 +538,13 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
     form_set_error('basic_options][usermap_type', t('You must specify a user mapping method.'));
   }
 
+  // make sure that either path alias OR redirect is enabled
+  if ($form_state['values']['advanced_options']['aliases'] && 
+      $form_state['values']['advanced_options']['redirect']) {
+    form_set_error('advanced_options][aliases', t('Make sure that either path alias OR redirect is enabled.'));
+    form_set_error('advanced_options][redirect', '');
+  }
+
   // Test if images directory is valid
   if ($form_state['values']['advanced_options']['images']) {
     $dir = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
@@ -544,6 +565,8 @@ function wordpress_import_form_options_submit(&$form, &$form_state) {
 
   // Clear messages
   backdrop_get_messages();
+
+  dpm($form_state);
 
   $form_state['values']['advanced_options']['images_dir'] = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
 
