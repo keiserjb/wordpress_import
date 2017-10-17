@@ -549,14 +549,14 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
   if ($form_state['values']['advanced_options']['images']) {
     $dir = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
     if (!is_dir($dir)) {
-      if (!@mkdir($dir)) {
+      if (!backdrop_mkdir($dir)) {
         form_set_error('advanced_options][images_dir', t('Invalid images directory specified.'));
         $form['advanced_options']['#collapsed'] = FALSE;
       }
-      else {
-        @rmdir($dir);
-      }
     }
+  }
+  elseif (is_dir($dir)) {
+    backdrop_rmdir($dir);
   }
 }
 
@@ -565,8 +565,6 @@ function wordpress_import_form_options_submit(&$form, &$form_state) {
 
   // Clear messages
   backdrop_get_messages();
-
-  dpm($form_state);
 
   $form_state['values']['advanced_options']['images_dir'] = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
 
