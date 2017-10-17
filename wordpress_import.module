@@ -240,11 +240,9 @@ function wordpress_import_form_file($form, &$form_state) {
   );
 
   // Create and scan module directory
-  // $wordpress_import_path = file_create_path('wordpress');
-  // $wordpress_import_path = drupal_mkdir('public://wordpress');
-  $wordpress_import_path = backdrop_realpath('public://wordpress');
-  file_prepare_directory($wordpress_import_path);
-  // $files = file_scan_directory($wordpress_import_path, '.*\.xml');/.*.png$/i
+  $directory = 'public://wordpress';
+  $wordpress_import_path = backdrop_realpath($directory);
+  $erg = file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
   $files = file_scan_directory($wordpress_import_path, '/.*.xml$/i');
 
   if (count($files) > 0) {
@@ -256,7 +254,7 @@ function wordpress_import_form_file($form, &$form_state) {
   }
   else {
     $options = array();
-    $description = t('No files found in %directory', array('%directory' => file_create_uri(file_default_scheme() .'/wordpress')));
+    $description = t('No files found in %directory', array('%directory' => file_create_url(file_default_scheme() .'/wordpress')));
   }
 
   // Local file selector element
@@ -282,10 +280,12 @@ function wordpress_import_form_file_validate(&$form, &$form_state) {
   }
 
   // Process uploaded file (if any), and set file path
-  $upload = file_save_upload('upload');
+  $directory = 'public://wordpress';
+  $validators = array('file_validate_extensions' => array('xml'));
+  $upload = file_save_upload('upload', $validators, $directory);
   if ($upload) {
     $form_state['values']['upload'] = $upload->filename;
-    $filepath = $upload->filepath;
+    $filepath = backdrop_realpath($upload->uri);
   }
   else {
     $filepath = backdrop_realpath('public://wordpress') . '/' . $form_state['values']['local'];
@@ -350,7 +350,7 @@ function wordpress_import_form_options($form, &$form_state) {
       }
   }
 
-  // find text formats 
+  // find text formats
   $content_formats = array('' => '');
   $formats = filter_formats();
   foreach ($formats as $format) {
@@ -539,7 +539,7 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
   }
 
   // make sure that either path alias OR redirect is enabled
-  if ($form_state['values']['advanced_options']['aliases'] && 
+  if ($form_state['values']['advanced_options']['aliases'] &&
       $form_state['values']['advanced_options']['redirect']) {
     form_set_error('advanced_options][aliases', t('Make sure that either path alias OR redirect is enabled.'));
     form_set_error('advanced_options][redirect', '');
@@ -1208,7 +1208,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
                 $reader->read();
                 $reader->read();
                 $reader->read();
-                $reader->read(); 
+                $reader->read();
                 $post['translations'][$components[1]]['title'] = $reader->value;
               }
             }
@@ -1397,7 +1397,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   if (isset($post['translations'])) {
 
     if ($temp_node != NULL) {
-      // node already exists, so switch 
+      // node already exists, so switch
       $node = $temp_node;
     }
 
@@ -1421,11 +1421,11 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       }
       $tn->path['langcode'] = $key;
       if (isset($node->field_category)) {
-        $tn->field_category = $node->field_category;  
+        $tn->field_category = $node->field_category;
       }
       if (isset($node->field_tags)) {
-        $tn->field_tags = $node->field_tags;  
-      }      
+        $tn->field_tags = $node->field_tags;
+      }
 
       if (has_node_duplicate($tn) === FALSE) {
         node_save($tn);
@@ -1440,11 +1440,11 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
         // we need to set the tnid of the original node, too
         if ($node->tnid != $node->nid) {
           $node->tnid = $node->nid;
-          node_save($node);          
+          node_save($node);
         }
       }
     }
-  } 
+  }
 
   // Node OG parameters
   if (module_exists('og') && $node_og) {
@@ -1908,7 +1908,7 @@ function wordpress_import_create_redirect($node, $path) {
   $redirect->source = $path;
   $redirect->redirect = 'node/' . $node->nid;;
 
-  redirect_save($redirect);  
+  redirect_save($redirect);
 }
 
 
