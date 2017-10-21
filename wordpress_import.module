@@ -1380,7 +1380,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // Process images for this post
   if ($wordpress_import->options['images']) {
-    wordpress_import_process_post_images($node->body, $wordpress_import->options['images_dir'], $context);
+    wordpress_import_process_post_images($node->body[LANGUAGE_NONE][0]['value'], $wordpress_import->options['images_dir'], $context);
   }
 
   // Save the node
@@ -1690,19 +1690,22 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
 
         if ($imgnewurl) {
 
-          // Download image
-          $imgfile = file_create_filename(urldecode($imginfo['basename']), $images_dir);
-          $imgout = fopen($imgfile, 'wb');
-          $ch = curl_init($imgnewurl);
-          curl_setopt($ch, CURLOPT_HEADER, FALSE);
-          curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-          curl_setopt($ch, CURLOPT_FILE, $imgout);
-          curl_exec($ch);
-          curl_close($ch);
-          fclose($imgout);
+          // Download image if it not exists
+          $new_file_name = 'public://' . $images_dir . '/' . $imginfo['basename'];
+          if (!file_exists($new_file_name)) {
+            $imgfile = file_create_filename(urldecode($imginfo['basename']), $images_dir);
+            $imgout = fopen($imgfile, 'wb');
+            $ch = curl_init($imgnewurl);
+            curl_setopt($ch, CURLOPT_HEADER, FALSE);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_FILE, $imgout);
+            curl_exec($ch);
+            curl_close($ch);
+            fclose($imgout);
+          }
 
           $newurl = $base_path . $images_dir . '/' . $imginfo['basename'];
-
+dpm($imgurl); dpm($newurl);
           // Replace image URL with new path in post
           $body = str_replace($imgurl, $newurl, $body);
           $context['sandbox']['downloaded_images'][] = array('oldurl' => $imgurl, 'newurl' => $newurl, 'file' => $imgfile);
