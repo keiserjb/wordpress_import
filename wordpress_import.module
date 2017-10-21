@@ -1275,6 +1275,11 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   $format = ($post['type'] == 'post') ? $wordpress_import->options['nodetype_post_format'] : $wordpress_import->options['nodetype_page_format'];
 
+  // Process images for this post and replace URLs
+  if ($wordpress_import->options['images']) {
+    wordpress_import_process_post_images($post['content'], $wordpress_import->options['images_dir'], $context);
+  }
+
   // Node content
   $node->body[LANGUAGE_NONE][0]['value'] = str_replace('<!--more-->', '<!--break-->', $post['content']);
   $node->body[LANGUAGE_NONE][0]['format'] =  $format;
@@ -1378,11 +1383,6 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     }
   }
 
-  // Process images for this post
-  if ($wordpress_import->options['images']) {
-    wordpress_import_process_post_images($node->body[LANGUAGE_NONE][0]['value'], $wordpress_import->options['images_dir'], $context);
-  }
-
   // Save the node
   node_save($node);
 
@@ -1400,6 +1400,11 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     }
 
     foreach ($post['translations'] as $key => $value) {
+      // Process images for this post and replace URLs
+      if ($wordpress_import->options['images']) {
+        wordpress_import_process_post_images($value['body'], $wordpress_import->options['images_dir'], $context);
+      }
+
       $tn = new Node();
       $tn->type = $node->type;
       $tn->langcode = $key;
