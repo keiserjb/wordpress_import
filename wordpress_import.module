@@ -1455,6 +1455,9 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   // Create redirect for this node
   if (module_exists('redirect') && $wordpress_import->options['redirect']) {
     wordpress_import_create_redirect($node, $node_path);
+
+    // also create a redirect with no language
+    wordpress_import_create_redirect($tn, $node_path, FALSE);
   }
 
   // Update messages infos with nid
@@ -1900,9 +1903,15 @@ function wordpress_import_get_terms($vid) {
 
 
 
-function wordpress_import_create_redirect($node, $path) {
+function wordpress_import_create_redirect($node, $path, $with_lang = TRUE) {
   $redirect = new Redirect();
-  $redirect->langcode = $node->langcode;
+  if ($with_lang) {
+    $redirect->langcode = $node->langcode;
+  }
+  else {
+    $redirect->langcode = LANGUAGE_NONE;
+  }
+
   $redirect->source = $path;
   $redirect->redirect = 'node/' . $node->nid;;
 
