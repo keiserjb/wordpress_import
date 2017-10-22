@@ -1696,7 +1696,7 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
         if ($imgnewurl) {
 
           // Download image if it not exists
-          $new_file_name = 'public://' . $images_dir . '/' . $imginfo['basename'];
+          $new_file_name = $images_dir . '/' . $imginfo['basename'];
           if (!file_exists($new_file_name)) {
             $imgfile = file_create_filename(urldecode($imginfo['basename']), $images_dir);
             $imgout = fopen($imgfile, 'wb');
@@ -1709,8 +1709,8 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
             fclose($imgout);
           }
 
-          $newurl = $base_path . $images_dir . '/' . $imginfo['basename'];
-dpm($imgurl); dpm($newurl);
+          $newurl = /* $base_path . */ $images_dir . '/' . $imginfo['basename'];
+
           // Replace image URL with new path in post
           $body = str_replace($imgurl, $newurl, $body);
           $context['sandbox']['downloaded_images'][] = array('oldurl' => $imgurl, 'newurl' => $newurl, 'file' => $imgfile);
@@ -1924,6 +1924,18 @@ function wordpress_import_create_redirect($node, $path, $with_lang = TRUE) {
   $redirect->redirect = 'node/' . $node->nid;;
 
   redirect_save($redirect);
+}
+
+function wordpress_import_create_menu_link($node, $menu_name, $expanded = FALSE, $options = array()) {
+  $item = array(
+    'link_path' => 'node/' . $node->nid,
+    'link_title' => $node->title,
+    'menu_name' => $menu_name,
+    'expanded' => $expanded,
+    'options' => $options,
+  );
+
+  menu_link_save(menu_link_save($item));
 }
 
 
