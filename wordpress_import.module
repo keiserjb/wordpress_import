@@ -487,7 +487,7 @@ function wordpress_import_form_options($form, &$form_state) {
   $form['advanced_options']['images_dir'] = array(
     '#type' => 'textfield',
     '#title' => t('Images directory'),
-    '#default_value' => '/images',
+    '#default_value' => '/wp_images',
     '#description' => t('Subdirectory of <strong>@file_directory_path</strong> in which to place files, must start with /', array('@file_directory_path' => file_directory_path()))
   );
 
@@ -549,10 +549,12 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
     form_set_error('basic_options][create_menu_items_page_menu', t('Please select the menu, where the item should be added'));
   }
 
-  if (empty($form_state['values']['basic_options']['nodetype_post_format'])) {
+  if (empty($form_state['values']['basic_options']['nodetype_post_format'])
+      && $form_state['values']['basic_options']['nodetype_post'] != 'noimport') {
     form_set_error('basic_options][nodetype_post_format', t('You must specify a format to import Wordpress posts into.'));
   }
-  if (empty($form_state['values']['basic_options']['nodetype_page_format'])) {
+  if (empty($form_state['values']['basic_options']['nodetype_page_format'])
+      && $form_state['values']['basic_options']['nodetype_pagr'] != 'noimport') {
     form_set_error('basic_options][nodetype_page_format', t('You must specify a format to import Wordpress posts into.'));
   }
 
@@ -571,6 +573,7 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
   // Test if images directory is valid
   if ($form_state['values']['advanced_options']['images']) {
     $dir = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
+
     if (!is_dir($dir)) {
       if (!backdrop_mkdir($dir)) {
         form_set_error('advanced_options][images_dir', t('Invalid images directory specified.'));
@@ -1462,6 +1465,17 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
           wordpress_import_create_redirect($tn, $node_path);
         }
 
+        // create menu link if $node type is page and selected
+        if ($wordpress_import->options['create_menu_items_page']
+            && $tn->type == $wordpress_import->options['nodetype_page']) {
+          // here we have translated nodes, so use language in options
+          $options = array();
+          $language_list = language_list('enabled');
+          if (isset($language_list[$tn->langcode])) {
+            $options['language'] = $language_list[$tn->langcode];
+          }
+          wordpress_import_create_menu_link($tn, $wordpress_import->options['create_menu_items_page_menu'], FALSE, $options);
+        }
 
         // we need to set the tnid of the original node, too
         if ($node->tnid != $node->nid) {
@@ -1485,8 +1499,22 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     wordpress_import_create_redirect($node, $node_path);
 
     // also create a redirect with no language
-    wordpress_import_create_redirect($tn, $node_path, FALSE);
+    wordpress_import_create_redirect($node, $node_path, FALSE);
   }
+
+  // create menu link if $node type is page and selected
+  if ($wordpress_import->options['create_menu_items_page']
+      && $node->type == $wordpress_import->options['nodetype_page']) {
+    $options = array();
+    if ($node->langcode != LANGUAGE_NONE) {
+      $language_list = language_list('enabled');
+      if (isset($language_list[$node->langcode])) {
+        $options['language'] = $language_list[$node->langcode];
+      }
+    }
+    wordpress_import_create_menu_link($node, $wordpress_import->options['create_menu_items_page_menu'], FALSE, $options);
+  }
+
 
   // Update messages infos with nid
   if (!empty($context['sandbox']['downloaded_images']) || !empty($context['sandbox']['error_images'])) {
@@ -1732,7 +1760,9 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
             fclose($imgout);
           }
 
-          $newurl = /* $base_path . */ $images_dir . '/' . $imginfo['basename'];
+          $rel_dir = str_replace('.', '', $images_dir);
+
+          $newurl = /* $base_path . */ $rel_dir . '/' . $imginfo['basename'];
 
           // Replace image URL with new path in post
           $body = str_replace($imgurl, $newurl, $body);
@@ -1952,13 +1982,12 @@ function wordpress_import_create_redirect($node, $path, $with_lang = TRUE) {
 function wordpress_import_create_menu_link($node, $menu_name, $expanded = FALSE, $options = array()) {
   $item = array(
     'link_path' => 'node/' . $node->nid,
-    'link_title' => $node->title,
+    'link_title' => empty($node->title) ? 'Untitled' : $node->title,
     'menu_name' => $menu_name,
-    'expanded' => $expanded,
+    // 'expanded' => $expanded,
     'options' => $options,
   );
-
-  menu_link_save(menu_link_save($item));
+  menu_link_save($item);
 }
 
 
