@@ -14,6 +14,13 @@ Installation
 - Visit the page under Administration > Content > Wordpress Import
   and follow the steps.
 
+Dependencies
+------------
+
+Form Wizard for multistep forms.
+See https://backdropcms.org/project/form_wizard
+
+
 Documentation
 -------------
 
