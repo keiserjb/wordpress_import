@@ -54,8 +54,8 @@ Current Maintainers
 Credits
 -------
 
-Originally written for Drupal by Jerome Charaoui, aka lavamind (http://www.koumbit.org/)
-Originally written for Drupal by Yann Rocq (http://www.rocq.net/yann/)
+ - Originally written for Drupal by Jerome Charaoui, aka lavamind (http://www.koumbit.org/)
+ - Originally written for Drupal by Yann Rocq (http://www.rocq.net/yann/)
 
 License
 -------
