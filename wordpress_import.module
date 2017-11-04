@@ -1416,7 +1416,8 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   }
 
   // Save the node
-  node_save($node);
+  $result = node_save($node);
+  $context['created_items'][] = array('$node' => $node->nid);
 
   // Process comments and trackbacks for this post
   if (module_exists('comment') && !empty($post['comments'])) {
@@ -1465,6 +1466,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       if (has_node_duplicate($tn) === FALSE) {
         node_save($tn);
         $context['results']['created_nodes']++;
+        $context['created_items'][] = array('$node' => $tn->nid);
 
         // Create redirect for the translated node
         if (module_exists('redirect') && $wordpress_import->options['redirect']) {
