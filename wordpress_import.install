@@ -1,0 +1,33 @@
+<?php
+
+/**
+ * Implementation of hook_schema()
+ */
+function wordpress_import_schema() {
+  $schema['wordpress_import'] = array(
+    // Example (partial) specification for table "node".
+    'description' => 'The table for wordpress import rollbacks.',
+    'fields' => array(
+      'iid' => array(
+        'description' => 'The unique ID.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'identifier' => array(
+        'description' => 'The identifier of this import.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'value' => array(
+        'description' => 'The serealized value.',
+        'type' => 'blob',
+      ),
+    ),
+    'primary key' => array('iid'),
+  );
+
+  return $schema;
+}
