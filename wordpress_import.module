@@ -254,7 +254,7 @@ function wordpress_import_form_file($form, &$form_state) {
   }
   else {
     $options = array();
-    $description = t('No files found in %directory', array('%directory' => file_create_url(file_default_scheme() .'/wordpress')));
+    $description = t('No files found in %directory', array('%directory' => file_create_url('files/wordpress')));
   }
 
   // Local file selector element
