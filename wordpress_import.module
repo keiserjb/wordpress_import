@@ -1564,34 +1564,6 @@ function wordpress_import_process_post_link($link, $baseurl) {
   return $path;
 }
 
-/**
- * Process post categories and tags and associate to taxonomy terms
- */
-function wordpress_import_process_post_categories_tags($categories, $categories_vocabulary, $categories_map, $tags, $tags_vocabulary) {
-
-  $taxonomy = array();
-  $drupal_tags = array();
-
-  // Remove duplicates
-  $categories = array_unique($categories);
-  $tags = array_unique($tags);
-
-  // Process categories
-  foreach ($categories as $category) {
-    $term = $categories_map[$category];
-    if (!empty($term)) {
-        $taxonomy[$categories_vocabulary][] = $term;
-    }
-  }
-
-  // Process tags
-  if (!empty($tags)) {
-    $taxonomy['tags'][$tags_vocabulary] = join(',', $tags);
-  }
-
-  return $taxonomy;
-
-}
 
 /**
  * Process comments and trackbacks for this post
