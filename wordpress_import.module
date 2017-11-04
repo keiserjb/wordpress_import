@@ -268,7 +268,7 @@ function wordpress_import_form_file($form, &$form_state) {
   $form['rollback'] = array(
     '#type' => 'button',
     '#value' => t('Rollback'),
-    '#submit' => array('wordpress_import_rollback'),
+    '#process' => array('wordpress_import_rollback'),
     '#disabled' => empty(tempstore_get('wordpress_import', 'created_elements')) ? TRUE : FALSE,
   );
 
@@ -1468,7 +1468,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       if (has_node_duplicate($tn) === FALSE) {
         node_save($tn);
         $context['results']['created_nodes']++;
-        $context['created_items'][] = array('$node' => $tn->nid);
+        $context['created_items'][] = array('node' => $tn->nid);
 
         // Create redirect for the translated node
         if (module_exists('redirect') && $wordpress_import->options['redirect']) {
@@ -1996,7 +1996,9 @@ function wordpress_import_rollback() {
 function wordpress_import_rollback_callback($item_type, $item_id, &$context) {
 
   $function = $item_type . '_delete';
-  $function($item_id);
+  if(function_exists($function)) {
+    $function($item_id);
+  }
 }
 
 function wordpress_import_rollback_finished($success, $results, $operations) {
