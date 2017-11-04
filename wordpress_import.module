@@ -65,36 +65,6 @@ function wordpress_import_menu() {
 }
 
 /**
- * Implementation of hook_schema()
- */
-function wordpress_import_schema() {
-  $schema['wordpress_import'] = array(
-    // Example (partial) specification for table "node".
-    'description' => 'The table for wordpress import rollbacks.',
-    'fields' => array(
-      'iid' => array(
-        'type' => 'serial',
-        'description' => 'The primary identifier.',
-        'unsigned' => TRUE,
-        'not null' => TRUE
-      ),
-      'identifier' => array(
-        'description' => 'The identifier of this import.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-      ),
-      'value' => array(
-        'description' => 'The the serealized value.',
-        'type' => 'longblob',
-      ),
-      'primary key' => array('nid'),
-    ),
-  );
-}
-
-
-/**
  * hook_perm
  *
  * @return array perms
@@ -1592,7 +1562,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // store the new generated items to the tempstore
   // and make it valid for three days
-  wordpress_import_db_set(['wordpress_import_obj']->import_id , $context['results']['created_items']);
+  wordpress_import_db_set($wordpress_import->import_id , $context['results']['created_items']);
 }
 
 /**
