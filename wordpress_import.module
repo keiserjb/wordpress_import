@@ -1069,7 +1069,6 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
 
   if (!empty($wordpress_import->data['categories'])) {
 
-    // $wordpress_import->categories_vocabulary = wordpress_import_create_vocabulary('category', $category_vocabulary_data);
     $wordpress_import->categories_vocabulary = $wordpress_import->options['nodetype_post_tm']['category_vocabulary'];
     $wordpress_import->categories_map = wordpress_import_get_terms($wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
 
@@ -1923,37 +1922,6 @@ function wordpress_import_read_wxr(&$wordpress_import) {
   return $is_wxr_file && $is_valid_xml;
 }
 
-/**
- * Create a Drupal vocabulary and return it's vid.
- */
-function wordpress_import_create_vocabulary($type, $vocabulary_data) {
-
-  $vocabulary = FALSE;
-
-  // Check if a category for Wordpress already exists
-  $vocabulary_id = variable_get('wordpress_import_'. $type, 0);
-
-  if ($vocabulary_id) {
-    $vocabulary = taxonomy_vocabulary_load($vocabulary_id);
-  }
-
-  if ($vocabulary) {
-    return $vocabulary->machine_name;
-  }
-  else {
-    // create machine name
-    $machine_readable = strtolower($vocabulary_data['name']);
-    $machine_readable = preg_replace('@[^a-z0-9_]+@','_', $machine_readable);
-    // convert to backdrops Taxonomy class
-    $new_vocab = new TaxonomyVocabulary();
-    $new_vocab->name = $vocabulary_data['name'];
-    $new_vocab->machine_name = $machine_readable;
-
-    taxonomy_vocabulary_save($new_vocab);
-    variable_set('wordpress_import_'. $type, $new_vocab->machine_name);
-    return $new_vocab->machine_name;
-  }
-}
 
 /**
  * Return an array of taxonomy terms belonging to a vocabulary
