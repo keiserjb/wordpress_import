@@ -54,6 +54,12 @@ function wordpress_import_menu() {
     'page callback' => 'wordpress_import_home',
     'access arguments' => array('import wordpress blog'),
     );
+  $items['admin/content/wordpress_import/rollback'] = array(
+    'title' => 'Wordpress import rollback',
+    'description' => 'Rollback last Wordpress Import',
+    'page callback' => 'wordpress_import_rollback',
+    'access arguments' => array('import wordpress blog'),
+    );
 
   return $items;
 }
@@ -264,13 +270,6 @@ function wordpress_import_form_file($form, &$form_state) {
       '#description' => $description,
       '#options' => $options
     );
-
-  $form['rollback'] = array(
-    '#type' => 'button',
-    '#value' => t('Rollback'),
-    '#process' => array('wordpress_import_rollback'),
-    '#disabled' => empty(tempstore_get('wordpress_import', 'created_elements')) ? TRUE : FALSE,
-  );
 
   $form['#attributes'] = array('enctype' => "multipart/form-data");
 
@@ -1991,7 +1990,7 @@ function wordpress_import_rollback() {
     'error_message' => t('Wordpress import has encountered an error.'),
   );
   batch_set($batch);
-  batch_process();
+  batch_process('/admin/content/wordpress_import');
 }
 
 function wordpress_import_rollback_callback($item_type, $item_id, &$context) {
@@ -2005,6 +2004,7 @@ function wordpress_import_rollback_callback($item_type, $item_id, &$context) {
 function wordpress_import_rollback_finished($success, $results, $operations) {
   if ($success) {
     backdrop_set_message('Rollback successful');
+    tempstore_clear('wordpress_import', 'created_elements');
   }
 }
 
