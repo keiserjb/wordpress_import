@@ -1544,6 +1544,10 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   unset($context['sandbox']['post']);
   unset($context['sandbox']['downloaded_images']);
   unset($context['sandbox']['error_images']);
+
+  // store the new generated items to the tempstore
+  // and make it valid for three days
+  tempstore_set('wordpress_import', 'created_elements', $context['created_items'], REQUEST_TIME + 259200);
 }
 
 /**
