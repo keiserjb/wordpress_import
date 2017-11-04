@@ -1697,6 +1697,9 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
   // Save comments
   foreach ($node_comments as $node_comment) {
     $comment_id = comment_save($node_comment);
+    if ($comment_id) {
+      $context['created_items'][] = array('comment' => $comment_id);
+    }
     // Update fields that haven't been set by comment_save
     db_query("UPDATE {comment} SET hostname= '@hn', created= @ts, status= @st WHERE cid= @id", array(
       '@hn' => $node_comment->hostname,
@@ -1999,7 +2002,7 @@ function wordpress_import_rollback() {
   }
 
   $batch = array(
-    'operations' => $operations;
+    'operations' => $operations,
     'finished' => 'wordpress_import_rollback_finished',
     'title' => t('Wordpress import'),
     'init_message' => t('Wordpress import rollback is starting processing'),
