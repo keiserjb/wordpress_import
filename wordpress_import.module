@@ -1087,6 +1087,7 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
         }
 
         taxonomy_term_save($term);
+        $context['created_items'][] = array('taxonomy_term' => $term->tid);
 
         // we need to insert the parent to the table manually
         db_insert('taxonomy_term_hierarchy')
@@ -1119,6 +1120,7 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
         $term->parent = 0;
 
         taxonomy_term_save($term);
+        $context['created_items'][] = array('taxonomy_term' => $term->tid);
 
         // we need to insert the parent to the table manually
         db_insert('taxonomy_term_hierarchy')
@@ -1390,7 +1392,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
             $tid = get_term_id($value, $wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
             if ($tid) {
               $field_name = $wordpress_import->options['nodetype_post_tm']['category_fieldname'];
-              $field = $node->$field_name;
+              $field = $node->{$field_name};
               // $field[LANGUAGE_NONE][]['tid'] = $wordpress_import->categories_map[$value];
               $field[LANGUAGE_NONE][]['tid'] = $tid;
               $node->$field_name = $field;
@@ -1404,7 +1406,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
             $tid = get_term_id($value, $wordpress_import->options['nodetype_post_tm']['tag_vocabulary']);
             if ($tid) {
               $field_name = $wordpress_import->options['nodetype_post_tm']['tag_fieldname'];
-              $field = $node->$field_name;
+              $field = $node->{$field_name};
               // $field[LANGUAGE_NONE][]['tid'] = $wordpress_import->tags_map[$value];
               $field[LANGUAGE_NONE][]['tid'] = $tid;
               $node->$field_name = $field;
@@ -1417,7 +1419,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // Save the node
   $result = node_save($node);
-  $context['created_items'][] = array('$node' => $node->nid);
+  $context['created_items'][] = array('node' => $node->nid);
 
   // Process comments and trackbacks for this post
   if (module_exists('comment') && !empty($post['comments'])) {
