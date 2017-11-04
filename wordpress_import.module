@@ -1481,7 +1481,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
           if (isset($language_list[$tn->langcode])) {
             $options['language'] = $language_list[$tn->langcode];
           }
-          wordpress_import_create_menu_link($tn, $wordpress_import->options['create_menu_items_page_menu'], FALSE, $options);
+          wordpress_import_create_menu_link($tn, $wordpress_import->options['create_menu_items_page_menu'], $context, FALSE, $options);
         }
 
         // we need to set the tnid of the original node, too
@@ -1519,7 +1519,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
         $options['language'] = $language_list[$node->langcode];
       }
     }
-    wordpress_import_create_menu_link($node, $wordpress_import->options['create_menu_items_page_menu'], FALSE, $options);
+    wordpress_import_create_menu_link($node, $wordpress_import->options['create_menu_items_page_menu'], $context, FALSE, $options);
   }
 
 
@@ -1971,7 +1971,7 @@ function wordpress_import_get_terms($vid) {
 
 
 
-function wordpress_import_create_redirect($node, $path, $with_lang = TRUE) {
+function wordpress_import_create_redirect($node, $path, &$context, $with_lang = TRUE) {
   $redirect = new Redirect();
   if ($with_lang) {
     $redirect->langcode = $node->langcode;
@@ -1983,10 +1983,13 @@ function wordpress_import_create_redirect($node, $path, $with_lang = TRUE) {
   $redirect->source = $path;
   $redirect->redirect = 'node/' . $node->nid;;
 
-  redirect_save($redirect);
+  $result = redirect_save($redirect);
+  if (($result == SAVED_NEW) || ($result == SAVED_UPDATED)) {
+    $context['created_items'][] = array('redirect' => $redirect->rid);
+  }
 }
 
-function wordpress_import_create_menu_link($node, $menu_name, $expanded = FALSE, $options = array()) {
+function wordpress_import_create_menu_link($node, $menu_name, &$context, $expanded = FALSE, $options = array()) {
   $item = array(
     'link_path' => 'node/' . $node->nid,
     'link_title' => empty($node->title) ? 'Untitled' : $node->title,
@@ -1994,7 +1997,10 @@ function wordpress_import_create_menu_link($node, $menu_name, $expanded = FALSE,
     // 'expanded' => $expanded,
     'options' => $options,
   );
-  menu_link_save($item);
+  $mid = menu_link_save($item);
+  if ($mid) {
+    $context['created_items'][] = array('menu_link' => $mid);
+  }
 }
 
 /**
