@@ -1472,7 +1472,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
         // Create redirect for the translated node
         if (module_exists('redirect') && $wordpress_import->options['redirect']) {
-          wordpress_import_create_redirect($tn, $node_path);
+          wordpress_import_create_redirect($tn, $node_path, $context);
         }
 
         // create menu link if $node type is page and selected
@@ -1506,10 +1506,10 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // Create redirect for this node
   if (module_exists('redirect') && $wordpress_import->options['redirect']) {
-    wordpress_import_create_redirect($node, $node_path);
+    wordpress_import_create_redirect($node, $node_path, $context);
 
     // also create a redirect with no language
-    wordpress_import_create_redirect($node, $node_path, FALSE);
+    wordpress_import_create_redirect($node, $node_path, $context, FALSE);
   }
 
   // create menu link if $node type is page and selected
