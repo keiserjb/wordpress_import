@@ -1997,6 +1997,57 @@ function wordpress_import_create_menu_link($node, $menu_name, $expanded = FALSE,
   menu_link_save($item);
 }
 
+/**
+ * Process the rollback of the import in a batch.
+ * @return [type] [description]
+ */
+function wordpress_import_rollback() {
+
+  $created_items = tempstore_get('wordpress_import', 'created_elements');
+  if (empty($created_items)) {
+    return;
+  }
+
+  // setup the batch
+  $operations = array();
+  $counter++;
+  foreach ($created_items as $key => $value) {
+    $item_type = key($value);
+    $item_id = $value[$item_type];
+
+    $operations[] = array(
+      'wordpress_import_rollback_callback',
+      array(
+        $item_type,
+        $item_id,
+      ),
+    );
+  }
+
+  $batch = array(
+    'operations' => $operations;
+    'finished' => 'wordpress_import_rollback_finished',
+    'title' => t('Wordpress import'),
+    'init_message' => t('Wordpress import rollback is starting processing'),
+    'progress_message' => t('Processed @current out of @total.'),
+    'error_message' => t('Wordpress import has encountered an error.'),
+  );
+  batch_set($batch);
+  batch_process();
+}
+
+function wordpress_import_rollback_callback($item_type, $item_id, &$context) {
+
+  $function = $item_type . '_delete';
+  $function($item_id);
+}
+
+function wordpress_import_rollback_finished($success, $results, $operations) {
+  if ($success) {
+    backdrop_set_message('Rollback successful');
+  }
+}
+
 
 /**
  * cURL helper function since PHP has disabled redirection support.
