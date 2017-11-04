@@ -265,6 +265,13 @@ function wordpress_import_form_file($form, &$form_state) {
       '#options' => $options
     );
 
+  $form['rollback'] = array(
+    '#type' => 'button',
+    '#value' => t('Rollback'),
+    '#submit' => array('wordpress_import_rollback'),
+    '#disabled' => empty(tempstore_get('wordpress_import', 'created_elements')) ? TRUE : FALSE,
+  );
+
   $form['#attributes'] = array('enctype' => "multipart/form-data");
 
   // $form_state['no buttons'] = TRUE;
