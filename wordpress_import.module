@@ -979,6 +979,7 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
     $context['results']['password_protected'] = 0;
     $context['results']['created_comments'] = 0;
     $context['results']['created_trackbacks'] = 0;
+    $context['results']['created_items'] = array();
   }
 
   // Create Drupal vocabularies for Wordpress categories and tags and populate them
@@ -1087,7 +1088,7 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
         }
 
         taxonomy_term_save($term);
-        $context['created_items'][] = array('taxonomy_term' => $term->tid);
+        $context['results']['created_items'][] = array('taxonomy_term' => $term->tid);
 
         // we need to insert the parent to the table manually
         db_insert('taxonomy_term_hierarchy')
@@ -1120,7 +1121,7 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
         $term->parent = 0;
 
         taxonomy_term_save($term);
-        $context['created_items'][] = array('taxonomy_term' => $term->tid);
+        $context['results']['created_items'][] = array('taxonomy_term' => $term->tid);
 
         // we need to insert the parent to the table manually
         db_insert('taxonomy_term_hierarchy')
@@ -1419,7 +1420,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // Save the node
   $result = node_save($node);
-  $context['created_items'][] = array('node' => $node->nid);
+  $context['results']['created_items'][] = array('node' => $node->nid);
 
   // Process comments and trackbacks for this post
   if (module_exists('comment') && !empty($post['comments'])) {
@@ -1468,7 +1469,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       if (has_node_duplicate($tn) === FALSE) {
         node_save($tn);
         $context['results']['created_nodes']++;
-        $context['created_items'][] = array('node' => $tn->nid);
+        $context['results']['created_items'][] = array('node' => $tn->nid);
 
         // Create redirect for the translated node
         if (module_exists('redirect') && $wordpress_import->options['redirect']) {
@@ -1549,7 +1550,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
   // store the new generated items to the tempstore
   // and make it valid for three days
-  tempstore_set('wordpress_import', 'created_elements', $context['created_items'], REQUEST_TIME + 259200);
+  tempstore_set('wordpress_import', 'created_elements', $context['results']['created_items'], REQUEST_TIME + 259200);
 }
 
 /**
@@ -1678,7 +1679,7 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
   foreach ($node_comments as $node_comment) {
     $comment_id = comment_save($node_comment);
     if ($comment_id) {
-      $context['created_items'][] = array('comment' => $comment_id);
+      $context['results']['created_items'][] = array('comment' => $comment_id);
     }
     // Update fields that haven't been set by comment_save
     db_query("UPDATE {comment} SET hostname= '@hn', created= @ts, status= @st WHERE cid= @id", array(
@@ -1936,7 +1937,7 @@ function wordpress_import_create_redirect($node, $path, &$context, $with_lang = 
 
   $result = redirect_save($redirect);
   if (($result == SAVED_NEW) || ($result == SAVED_UPDATED)) {
-    $context['created_items'][] = array('redirect' => $redirect->rid);
+    $context['results']['created_items'][] = array('redirect' => $redirect->rid);
   }
 }
 
@@ -1950,7 +1951,7 @@ function wordpress_import_create_menu_link($node, $menu_name, &$context, $expand
   );
   $mid = menu_link_save($item);
   if ($mid) {
-    $context['created_items'][] = array('menu_link' => $mid);
+    $context['results']['created_items'][] = array('menu_link' => $mid);
   }
 }
 
