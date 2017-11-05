@@ -57,7 +57,8 @@ function wordpress_import_menu() {
   $items['admin/content/wordpress_import/rollback'] = array(
     'title' => 'Wordpress import rollback',
     'description' => 'Rollback last Wordpress Import',
-    'page callback' => 'wordpress_import_rollback',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('wordpress_rollback_form'),
     'access arguments' => array('import wordpress blog'),
     );
 
@@ -1967,13 +1968,48 @@ function wordpress_import_create_menu_link($node, $menu_name, &$context, $expand
   }
 }
 
+function wordpress_rollback_form($form, &$form_state) {
+
+  $result = db_select('wordpress_import', 'w')
+                    ->fields('w', array('iid', 'identifier'))
+                    ->execute();
+
+  $options = array();
+  while($record = $result->fetchAssoc()) {
+    $options[$record['iid']] = $record['identifier'];
+  }
+
+  $form['rollback_select'] = array(
+    '#type' => 'radios',
+    '#options' => $options,
+    '#title' => t('Select the import you want to roll back.'),
+  );
+  $form['rollback_submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Rollback',
+  );
+  return $form;
+}
+
+
+function wordpress_rollback_form_submit($form, &$form_state) {
+  $selected_rollback = $form_state['values']['rollback_select'];
+
+  if (!empty($selected_rollback)) {
+    wordpress_import_rollback($selected_rollback);
+  }
+  else {
+    backdrop_set_message('Please select a rollback', 'warning');
+  }
+}
+
 /**
  * Process the rollback of the import in a batch.
  * @return [type] [description]
  */
-function wordpress_import_rollback() {
+function wordpress_import_rollback($rollback_id) {
 
-  $created_items = tempstore_get('wordpress_import', 'created_elements');
+  $created_items = wordpress_import_db_get($rollback_id);
   if (empty($created_items)) {
     return;
   }
