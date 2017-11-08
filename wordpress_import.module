@@ -61,6 +61,13 @@ function wordpress_import_menu() {
     'page arguments' => array('wordpress_rollback_form'),
     'access arguments' => array('import wordpress blog'),
     );
+  $items['admin/content/wordpress_import/rollback_edit'] = array(
+    'title' => 'Wordpress import edit rollbacks',
+    'description' => 'Edit Rollbacks',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('wordpress_rollback_edit_form'),
+    'access arguments' => array('import wordpress blog'),
+    );
 
   return $items;
 }
@@ -2003,6 +2010,52 @@ function wordpress_rollback_form_submit($form, &$form_state) {
   }
 }
 
+
+function wordpress_rollback_edit_form($form, &$form_state) {
+
+  $result = db_select('wordpress_import', 'w')
+                    ->fields('w', array('iid', 'identifier'))
+                    ->execute();
+
+  $options = array();
+  while($record = $result->fetchAssoc()) {
+    $options[$record['iid']] = $record['identifier'];
+  }
+
+  $form['rollback_delete_select'] = array(
+    '#type' => 'checkboxes',
+    '#options' => $options,
+    '#title' => t('Select the import you want to delete.'),
+  );
+  $form['rollback_submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Delete',
+  );
+
+  return $form;
+}
+
+
+function wordpress_rollback_edit_form_submit($form, &$form_state) {
+  $selected_rollback = $form_state['values']['rollback_delete_select'];
+
+dpm($selected_rollback);
+  $ids = array();
+  foreach ($selected_rollback as $key => $value) {
+    if ($value != 0) {
+      $ids[] = $key;
+    }
+  }
+
+  if (!empty($ids)) {
+    wordpress_import_db_clear($ids);
+  }
+  else {
+    backdrop_set_message('Please select a rollback', 'warning');
+  }
+}
+
+
 /**
  * Process the rollback of the import in a batch.
  * @return [type] [description]
@@ -2053,7 +2106,6 @@ function wordpress_import_rollback_callback($item_type, $item_id, &$context) {
 function wordpress_import_rollback_finished($success, $results, $operations) {
   if ($success) {
     backdrop_set_message('Rollback successful');
-    tempstore_clear('wordpress_import', 'created_elements');
   }
 }
 
@@ -2181,6 +2233,6 @@ function wordpress_import_db_get($id) {
 
 function wordpress_import_db_clear($id) {
   db_delete('wordpress_import')
-    ->condition('iid', $id)
+    ->condition('iid', ($id), 'IN')
     ->execute();
 }
