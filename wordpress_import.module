@@ -56,17 +56,21 @@ function wordpress_import_menu() {
     );
   $items['admin/content/wordpress_import/rollback'] = array(
     'title' => 'Wordpress import rollback',
+    'type' => MENU_LOCAL_TASK,
     'description' => 'Rollback last Wordpress Import',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('wordpress_rollback_form'),
     'access arguments' => array('import wordpress blog'),
+    'weight' => 1,
     );
   $items['admin/content/wordpress_import/rollback_edit'] = array(
     'title' => 'Wordpress import edit rollbacks',
+    'type' => MENU_LOCAL_TASK,
     'description' => 'Edit Rollbacks',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('wordpress_rollback_edit_form'),
     'access arguments' => array('import wordpress blog'),
+    'weight' => 2,
     );
 
   return $items;
@@ -884,7 +888,6 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
   }
 
   foreach ($form_state['values']['newuser'] as $key => $value) {
-
     // Check usernames
     if ($error = user_validate_name($value['name'])) {
       form_set_error('newuser]['. $key .'][name', $error);
@@ -897,7 +900,7 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
     }
 
     // Check user emails
-    if ($error = user_validate_mail($value['mail'])) {
+    if ($error = valid_email_address($value['mail'])) {
       form_set_error('newuser]['. $key .'][mail', $error);
     }
     elseif (user_load(array('mail' => $value['mail']))) {
@@ -907,8 +910,8 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
       form_set_error('newuser]['. $key .'][mail', t('Two users have the same mail (!mail).', array('!mail' => $value['mail'])));
     }
 
-    $user['name'][] = strtolower($value['name']);
-    $user['mail'][] = strtolower($value['mail']);
+    $user->name[] = strtolower($value['name']);
+    $user->mail[] = strtolower($value['mail']);
   }
 }
 
@@ -2039,7 +2042,6 @@ function wordpress_rollback_edit_form($form, &$form_state) {
 function wordpress_rollback_edit_form_submit($form, &$form_state) {
   $selected_rollback = $form_state['values']['rollback_delete_select'];
 
-dpm($selected_rollback);
   $ids = array();
   foreach ($selected_rollback as $key => $value) {
     if ($value != 0) {
