@@ -54,10 +54,27 @@ function wordpress_import_menu() {
     'page callback' => 'wordpress_import_home',
     'access arguments' => array('import wordpress blog'),
     );
+  $items['admin/content/wordpress_import/rollback'] = array(
+    'title' => 'Wordpress import rollback',
+    'type' => MENU_LOCAL_TASK,
+    'description' => 'Rollback last Wordpress Import',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('wordpress_rollback_form'),
+    'access arguments' => array('import wordpress blog'),
+    'weight' => 1,
+    );
+  $items['admin/content/wordpress_import/rollback_edit'] = array(
+    'title' => 'Wordpress import edit rollbacks',
+    'type' => MENU_LOCAL_TASK,
+    'description' => 'Edit Rollbacks',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('wordpress_rollback_edit_form'),
+    'access arguments' => array('import wordpress blog'),
+    'weight' => 2,
+    );
 
   return $items;
 }
-
 
 /**
  * hook_perm
@@ -65,8 +82,13 @@ function wordpress_import_menu() {
  * @return array perms
  * @author Yann Rocq
  **/
-function wordpress_import_perm() {
-  return array('import wordpress blog');
+function wordpress_import_permission() {
+  return array(
+    'import wordpress blog' => array(
+      'title' => t('Import wordpress blog'),
+      'description' => t('Permission to import a wordpress blog.'),
+    ),
+  );
 }
 
 /**
@@ -76,7 +98,7 @@ function wordpress_import_home() {
 
   // XMLReader is required
   if (!extension_loaded('xmlreader')) {
-    drupal_set_message(t('<strong>XMLReader PHP extension not found!</strong>  The XMLReader extension is available in PECL as of PHP 5.0.0 and is included and enabled as of PHP 5.1.0 by default. It can be enabled by adding the argument --enable-xmlreader  (or --with-xmlreader before 5.1.0) to your configure line. The libxml  extension is required. '), 'error');
+    backdrop_set_message(t('<strong>XMLReader PHP extension not found!</strong>  The XMLReader extension is available in PECL as of PHP 5.0.0 and is included and enabled as of PHP 5.1.0 by default. It can be enabled by adding the argument --enable-xmlreader  (or --with-xmlreader before 5.1.0) to your configure line. The libxml  extension is required. '), 'error');
     return '';
   }
 
@@ -89,14 +111,14 @@ function wordpress_import_home() {
 function wordpress_import_wizard() {
   $step = arg(3);
 
-  ctools_include('wizard');
-  ctools_include('object-cache');
+//  ctools_include('wizard');
+//  ctools_include('object-cache');
 
   // *** SETUP ARRAY multistep setup ****
   $form_info = array(
     'id' => 'wordpress_import',
     'path' => "admin/content/wordpress_import/%step",
-    'show trail' => FALSE,
+    'show trail' => TRUE,
     'show back' => FALSE,
     'show cancel' => TRUE,
     'show return' => FALSE,
@@ -105,10 +127,12 @@ function wordpress_import_wizard() {
     'finish callback' => 'wordpress_import_form_subtask_finish',
     'return callback' => 'wordpress_import_form_subtask_finish',
     'cancel callback' => 'wordpress_import_form_subtask_cancel',
+    'ajax' => FALSE,
    // this controls order, as well as form labels
     'order' => array(
       'file' => t('Source file'),
       'options' => t('Options'),
+      'taxonomy' => t('Map taxonomies'),
       'og' => t('Organic groups'),
       'mapusers' => t('Map users'),
       'newusers' => t('New users'),
@@ -121,6 +145,9 @@ function wordpress_import_wizard() {
       ),
       'options' => array(
         'form id' => 'wordpress_import_form_options'
+      ),
+      'taxonomy' => array(
+        'form id' => 'wordpress_import_form_map_taxonomies'
       ),
       'og' => array(
         'form id' => 'wordpress_import_form_og'
@@ -139,62 +166,92 @@ function wordpress_import_wizard() {
 
   // *** SETTING THE FORM UP FOR MULTISTEP *** //
   $form_state = array(
-    'cache name' => NULL,
+    // 'cache name' => NULL,
+    'cache name' => '',
   );
 
-  $wordpress_import = wordpress_import_form_get_page_cache(NULL);
+  $wordpress_import = wordpress_import_form_get_page_cache('');
+  // $wordpress_import = NULL;
 
   if (!$wordpress_import && $step != '') {
-    drupal_goto('admin/content/wordpress_import');
+    backdrop_goto('admin/content/wordpress_import');
     return;
   }
 
   if (!$wordpress_import) {
-    drupal_set_message($step);
+    backdrop_set_message($step);
     $step = current(array_keys($form_info['order']));
     $wordpress_import = new stdClass();
-    ctools_object_cache_set('wordpress_import', $form_state['cache name'], $wordpress_import);
+    // ctools_object_cache_set('wordpress_import', $form_state['cache name'], $wordpress_import);
+    wordpress_import_form_set_page_cache($form_state['cache name'], $wordpress_import);
   }
 
   $form_state['wordpress_import_obj'] = $wordpress_import;
 
+  // Skip taxonomy mapping form if taxonomy import is deselected
+  if ($step == 'taxonomy' && !!$wordpress_import->options['disable_categories']) {
+    backdrop_goto('admin/content/wordpress_import/og');
+  }
+
   // Skip OG step if module isn't present, or if node content type isn't an OG-enabled
   if ($step == 'og' && (!module_exists('og') || !($wordpress_import->options['nodetype_post_og'] || $wordpress_import->options['nodetype_page_og']))) {
-    drupal_goto('admin/content/wordpress_import/mapusers');
+    backdrop_goto('admin/content/wordpress_import/mapusers');
   }
 
   // Skip users creation step if no new users
   if ($step == 'newusers' && !array_search('newuser', $wordpress_import->usermap)) {
-    drupal_goto('admin/content/wordpress_import/ready');
+    backdrop_goto('admin/content/wordpress_import/ready');
   }
 
-  $output = ctools_wizard_multistep_form($form_info, $step, $form_state);
+  // $output = ctools_wizard_multistep_form($form_info, $step, $form_state);
+  $output = form_wizard_multistep_form($form_info, $step, $form_state);
   return $output;
 }
 
 
-/*---------------- CTools cache handling functions ------------ */
+/*---------------- Bachdrop cache handling functions ------------ */
 
+/**
+ * Remove an item from the object cache.
+ */
 function wordpress_import_form_clear_page_cache($name) {
-  ctools_object_cache_clear('wordpress_import', $name);
+  // ctools_object_cache_clear('wordpress_import', $name);
+  tempstore_clear('wordpress_import', $name);
 }
 
-
+/**
+ * Get the cached changes to a given task handler.
+ */
 function wordpress_import_form_get_page_cache($name) {
-  $cache = ctools_object_cache_get('wordpress_import', $name);
+  // $cache = ctools_object_cache_get('wordpress_import', $name);
+  $cache = tempstore_get('wordpress_import', $name);
   return $cache;
+}
+
+/**
+ * Store changes to a task handler in the object cache.
+ */
+function wordpress_import_form_set_page_cache($name, $page) {
+  $cache = tempstore_set('wordpress_import', $name, $page, REQUEST_TIME + 3600);
 }
 
 
 /*-------------------------- Form Steps  ---------------------- */
 
-function wordpress_import_form_file(&$form, &$form_state) {
+// function wordpress_import_form_file(&$form, &$form_state) {
+function wordpress_import_form_file($form, &$form_state) {
   global $base_path;
 
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
   $form['informations'] = array(
    '#value' => t('This module will import a Wordpress eXtended RSS (WXR) file generated by Wordpress. If you need instructions on creating this file, please read the  <a href="@codex">documentation</a>. <em>You must make a backup copy of your Drupal database before proceeding!</em>', array('@codex' => url('http://codex.wordpress.org/Tools_Export_SubPanel')))
+  );
+
+  $form['import_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Give this import a unique title.'),
+    '#description' => t('Select a unique title to this import to detect it on rollback.'),
   );
 
   // Upload file form element
@@ -206,20 +263,21 @@ function wordpress_import_form_file(&$form, &$form_state) {
   );
 
   // Create and scan module directory
-  $wordpress_import_path = file_create_path('wordpress');
-  file_check_directory($wordpress_import_path, TRUE);
-  $files = file_scan_directory($wordpress_import_path, '.*\.xml');
+  $directory = 'public://wordpress';
+  $wordpress_import_path = backdrop_realpath($directory);
+  $erg = file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
+  $files = file_scan_directory($wordpress_import_path, '/.*.xml$/i');
 
   if (count($files) > 0) {
-    foreach (file_scan_directory($wordpress_import_path, '.*\.xml') as $file) {
-      $options[$file->basename] = $file->basename;
+    foreach ($files as $file) {
+      $options[$file->filename] = $file->filename;
     }
     ksort($options);
     $description = '';
   }
   else {
     $options = array();
-    $description = t('No files found in %directory', array('%directory' => file_create_path(file_directory_path() .'/wordpress')));
+    $description = t('No files found in %directory', array('%directory' => file_create_url('files/wordpress')));
   }
 
   // Local file selector element
@@ -232,7 +290,9 @@ function wordpress_import_form_file(&$form, &$form_state) {
 
   $form['#attributes'] = array('enctype' => "multipart/form-data");
 
-  $form_state['no buttons'] = TRUE;
+  // $form_state['no buttons'] = TRUE;
+
+  return $form;
 }
 
 
@@ -243,13 +303,20 @@ function wordpress_import_form_file_validate(&$form, &$form_state) {
   }
 
   // Process uploaded file (if any), and set file path
-  $upload = file_save_upload('upload');
+  $directory = 'public://wordpress';
+  $validators = array('file_validate_extensions' => array('xml'));
+  $upload = file_save_upload('upload', $validators, $directory);
   if ($upload) {
     $form_state['values']['upload'] = $upload->filename;
-    $filepath = $upload->filepath;
+    $filepath = backdrop_realpath($upload->uri);
   }
   else {
-    $filepath = file_directory_path() . '/wordpress/' . $form_state['values']['local'];
+    $filepath = backdrop_realpath('public://wordpress') . '/' . $form_state['values']['local'];
+  }
+
+  if (empty($form_state['values']['import_id'])) {
+    form_set_error('import_id', t('You must specify a title for this import.'));
+    return;
   }
 
   // Make sure a file was uploaded or a local file was selected
@@ -272,7 +339,7 @@ function wordpress_import_form_file_submit(&$form, &$form_state) {
   (!empty($form_state['values']['upload'])) ? ($filesource = t('uploaded')) : ($filesource = t('local'));
   $fileinfo = pathinfo($form_state['wordpress_import_obj']->filepath);
 
-  drupal_set_message(t('Successfully loaded @filesource file "@filename".', array('@filesource' => $filesource, '@filename' => $fileinfo['basename'])));
+  backdrop_set_message(t('Successfully loaded @filesource file "@filename".', array('@filesource' => $filesource, '@filename' => $fileinfo['basename'])));
 
   $message = t('The following elements were identified :');
 
@@ -283,15 +350,19 @@ function wordpress_import_form_file_submit(&$form, &$form_state) {
   $msg_found[] = '<li>' . t('@found_categories categories', array('@found_categories' => $form_state['wordpress_import_obj']->count['categories'])) . '</li>';
   $msg_found[] = '<li>' . t('@found_tags tags', array('@found_tags' => $form_state['wordpress_import_obj']->count['tags'])) . '</li>';
 
-  drupal_set_message($message . '<ul>' . join("\n", $msg_found) . '</ul>');
-
+  backdrop_set_message($message . '<ul>' . join("\n", $msg_found) . '</ul>');
+/*
   if (function_exists('dpm')) {
     dpm($form_state['wordpress_import_obj']->data);
   }
+*/
+  // create database entry
+  $iid = wordpress_import_db_create($form_state['values']['import_id']);
+  $form_state['wordpress_import_obj']->import_id = $iid;
 }
 
 
-function wordpress_import_form_options(&$form, &$form_state) {
+function wordpress_import_form_options($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
   $form['basic_options'] = array(
@@ -302,35 +373,80 @@ function wordpress_import_form_options(&$form, &$form_state) {
   );
 
   // Post content type
-  $node_types = node_get_types();
+  $node_types = node_type_get_types();
   $content_types = array('' => '', 'noimport' => t('Don\'t import'));
   foreach ($node_types as $k => $v) {
       if (!module_exists('og') || (module_exists('og') && !og_is_group_type($k))) {
         $content_types[$k] = $v->name;
       }
   }
+
+  // find text formats
+  $content_formats = array('' => '');
+  $formats = filter_formats();
+  foreach ($formats as $format) {
+    $content_formats[$format->format] = $format->name;
+  }
+
+  // find all menus
+  $available_menus = array('' => '') + menu_get_menus();
+
   $form['basic_options']['nodetype_post'] = array(
     '#type' => 'select',
     '#title' => t('Import posts in content type'),
-    '#description' => t('All imported posts will be assigned the selected content type. If you are unsure, select "Story"'),
+    '#description' => t('All imported posts will be assigned the selected content type.'),
     '#default_value' => '',
     '#options' => $content_types,
+    );
+  $form['basic_options']['nodetype_post_format'] = array(
+    '#type' => 'select',
+    '#title' => t('Import posts in text format'),
+    '#description' => t('All imported posts will be imported with the selected text format.'),
+    '#default_value' => '',
+    '#options' => $content_formats,
     );
   $form['basic_options']['nodetype_page'] = array(
     '#type' => 'select',
     '#title' => t('Import pages in content type'),
-    '#description' => t('All imported pages will be assigned the selected content type. If you are unsure, select "Page"'),
+    '#description' => t('All imported pages will be assigned the selected content type.'),
     '#default_value' => '',
     '#options' => $content_types,
+    );
+  $form['basic_options']['nodetype_page_format'] = array(
+    '#type' => 'select',
+    '#title' => t('Import pages in text format'),
+    '#description' => t('All imported pages will be imported with the selected text format.'),
+    '#default_value' => '',
+    '#options' => $content_formats,
+    );
+
+  $form['basic_options']['create_menu_items_page'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Create menu items for imported pages?'),
+    '#default_value' => FALSE,
+    '#disabled' => FALSE,
+    '#description' => t('Check this box to if you want to create menu items for the imported pages'),
+  );
+  $form['basic_options']['create_menu_items_page_menu'] = array(
+    '#type' => 'select',
+    '#title' => t('Create menu item in menu'),
+    '#description' => t('Select, in what menu the items should be created.'),
+    '#default_value' => '',
+    '#options' => $available_menus,
     );
 
   if (module_exists('locale')) {
     $default = language_default();
+    $options = array('' => t('Language neutral'));
+    $language_list = language_list();
+    foreach ($language_list as $value) {
+      $options[$value->langcode] = $value->name;
+    }
     $form['basic_options']['language'] = array(
       '#type' => 'select',
       '#title' => t('Language'),
-      '#default_value' => $default->language,
-      '#options' => array('' => t('Language neutral')) + locale_language_list('name'),
+      '#default_value' => $default->langcode,
+      '#options' => $options,
     );
   }
 
@@ -383,6 +499,15 @@ function wordpress_import_form_options(&$form, &$form_state) {
     '#description' => t('Preserve the path of the original Wordpress posts and pages. For this to work properly, your Drupal site root must be the same as the Wordpress site (!root) and clean URLs should be activated', array('!root' => $wordpress_import->data['baseurl']))
   );
 
+  $form['advanced_options']['redirect'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Create URL redirect'),
+    '#default_value' => FALSE,
+    '#disabled' => FALSE,
+    '#description' => t('Create an redirect of the original Wordpress posts and pages URLs. For this to work properly, your Drupal site root must be the same as the Wordpress site (!root) and clean URLs should be activated', array('!root' => $wordpress_import->data['baseurl']))
+  );
+
+
   $form['advanced_options']['images'] = array(
     '#type' => 'checkbox',
     '#title' => t('Transfer images'),
@@ -393,39 +518,46 @@ function wordpress_import_form_options(&$form, &$form_state) {
   $form['advanced_options']['images_dir'] = array(
     '#type' => 'textfield',
     '#title' => t('Images directory'),
-    '#default_value' => '/images',
-    '#description' => t('Subdirectory of <strong>@file_directory_path</strong> in which to place files, must start with /', array('@file_directory_path' => file_directory_path()))
+    '#default_value' => '/wp_images',
+    '#description' => t('Subdirectory of <strong>@file_directory_path</strong> in which to place files, must start with /', array('@file_directory_path' => file_directory_path())),
   );
 
   // Warn if some key modules are not found
   if (!module_exists('taxonomy')) {
-      drupal_set_message(t('Could not find module "path". <strong>Categories and tags will not be imported.</strong>'), 'error');
+      backdrop_set_message(t('Could not find module "path". <strong>Categories and tags will not be imported.</strong>'), 'error');
       $form['advanced_options']['disable_categories']['#default_value'] = TRUE;
       $form['advanced_options']['disable_categories']['#disabled'] = TRUE;
       $form['advanced_options']['#collapsed'] = FALSE;
   }
   if (!module_exists('comment')) {
-      drupal_set_message(t('Could not find module "comment". <strong>Comments and tackbacks will not be imported.</strong>'), 'error');
+      backdrop_set_message(t('Could not find module "comment". <strong>Comments and tackbacks will not be imported.</strong>'), 'error');
       $form['advanced_options']['disable_comments']['#default_value'] = TRUE;
       $form['advanced_options']['disable_comments']['#disabled'] = TRUE;
       $form['advanced_options']['#collapsed'] = FALSE;
   }
   if (!module_exists('trackback')) {
-      drupal_set_message(t('Could not find module "trackback". <strong>Trackbacks will not be imported.</strong>'), 'error');
+      backdrop_set_message(t('Could not find module "trackback". <strong>Trackbacks will not be imported.</strong>'), 'error');
       $form['advanced_options']['disable_trackbacks']['#default_value'] = TRUE;
       $form['advanced_options']['disable_trackbacks']['#disabled'] = TRUE;
       $form['advanced_options']['#collapsed'] = FALSE;
   }
   if (!module_exists('path')) {
-      drupal_set_message(t('Could not find module "path". Create paths option disabled.'), 'warning');
+      backdrop_set_message(t('Could not find module "path". Create paths option disabled.'), 'warning');
       $form['advanced_options']['aliases']['#default_value'] = FALSE;
       $form['advanced_options']['aliases']['#disabled'] = TRUE;
   }
+  if (!module_exists('redirect')) {
+      backdrop_set_message(t('Could not find module "redirect". Create redirect option disabled.'), 'warning');
+      $form['advanced_options']['redirect']['#default_value'] = FALSE;
+      $form['advanced_options']['redirect']['#disabled'] = TRUE;
+  }
   if (!extension_loaded('curl')) {
-      drupal_set_message(t('cURL PHP extension not available. Transfer images option disabled.'), 'warning');
+      backdrop_set_message(t('cURL PHP extension not available. Transfer images option disabled.'), 'warning');
       $form['advanced_options']['images']['#default_value'] = FALSE;
       $form['advanced_options']['images']['#disabled'] = TRUE;
   }
+
+  return $form;
 }
 
 
@@ -443,22 +575,45 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
     form_set_error('basic_options][nodetype', t('You must specify a content type to import Wordpress pages into.'));
   }
 
+  if ($form_state['values']['basic_options']['create_menu_items_page']
+      && empty($form_state['values']['basic_options']['create_menu_items_page_menu'])) {
+    form_set_error('basic_options][create_menu_items_page_menu', t('Please select the menu, where the item should be added'));
+  }
+
+  if (empty($form_state['values']['basic_options']['nodetype_post_format'])
+      && $form_state['values']['basic_options']['nodetype_post'] != 'noimport') {
+    form_set_error('basic_options][nodetype_post_format', t('You must specify a format to import Wordpress posts into.'));
+  }
+  if (empty($form_state['values']['basic_options']['nodetype_page_format'])
+      && $form_state['values']['basic_options']['nodetype_pagr'] != 'noimport') {
+    form_set_error('basic_options][nodetype_page_format', t('You must specify a format to import Wordpress posts into.'));
+  }
+
+
   if (empty($form_state['values']['basic_options']['usermap_type'])) {
     form_set_error('basic_options][usermap_type', t('You must specify a user mapping method.'));
+  }
+
+  // make sure that either path alias OR redirect is enabled
+  if ($form_state['values']['advanced_options']['aliases'] &&
+      $form_state['values']['advanced_options']['redirect']) {
+    form_set_error('advanced_options][aliases', t('Make sure that either path alias OR redirect is enabled.'));
+    form_set_error('advanced_options][redirect', '');
   }
 
   // Test if images directory is valid
   if ($form_state['values']['advanced_options']['images']) {
     $dir = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
+
     if (!is_dir($dir)) {
-      if (!@mkdir($dir)) {
+      if (!backdrop_mkdir($dir)) {
         form_set_error('advanced_options][images_dir', t('Invalid images directory specified.'));
         $form['advanced_options']['#collapsed'] = FALSE;
       }
-      else {
-        @rmdir($dir);
-      }
     }
+  }
+  elseif (is_dir($dir)) {
+    backdrop_rmdir($dir);
   }
 }
 
@@ -466,7 +621,7 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
 function wordpress_import_form_options_submit(&$form, &$form_state) {
 
   // Clear messages
-  drupal_get_messages();
+  backdrop_get_messages();
 
   $form_state['values']['advanced_options']['images_dir'] = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
 
@@ -485,7 +640,97 @@ function wordpress_import_form_options_submit(&$form, &$form_state) {
 }
 
 
-function wordpress_import_form_og(&$form, &$form_state) {
+function wordpress_import_form_map_taxonomies($form, &$form_state) {
+  $wordpress_import = &$form_state['wordpress_import_obj'];
+
+  // get the node types
+  $nodetype_post = $wordpress_import->options['nodetype_post'];
+  $nodetype_page = $wordpress_import->options['nodetype_page'];
+
+  // get the fields of the node type
+  $nodetype_post_fields = field_info_instances('node', $nodetype_post);
+  $nodetype_page_fields = field_info_instances('node', $nodetype_page);
+
+  // find the taxonomy-fields
+  $nodetype_post_taxonomy = array('noimport' => 'Do not import');
+  $nodetype_page_taxonomy = array('noimport' => 'Do not import');
+
+
+  foreach ($nodetype_post_fields as $field_name => $value) {
+    $field_info = field_info_field($field_name);
+    if (isset($field_info['type']) && ($field_info['type'] == 'taxonomy_term_reference')) {
+      $nodetype_post_taxonomy[$field_name] = $value['label'];
+    }
+  }
+/*
+  foreach ($nodetype_page_fields as $field_name => $value) {
+    $field_info = field_info_field($field_name);
+    if (isset($field_info['type']) && ($field_info['type'] == 'taxonomy_term_reference')) {
+      $nodetype_page_taxonomy[$field_name] = $value['label'];
+    }
+  }
+*/
+  $form['post_taxonomy_category'] = array(
+    '#type' => 'select',
+    '#title' => t('Import Category to vocabulary'),
+    '#description' => t('All categories will be assigned to that vocabulary'),
+    '#default_value' => 'noimport',
+    '#options' => $nodetype_post_taxonomy,
+  );
+
+  $form['post_taxonomy_tags'] = array(
+    '#type' => 'select',
+    '#title' => t('Import Tags to vocabulary'),
+    '#description' => t('All categories will be assigned to that vocabulary'),
+    '#default_value' => 'noimport',
+    '#options' => $nodetype_post_taxonomy,
+  );
+/*
+  $form['page_taxonomy_category'] = array(
+    '#type' => 'select',
+    '#title' => t('Import Category to vocabulary'),
+    '#description' => t('All categories will be assigned to that vocabulary'),
+    '#default_value' => 'noimport',
+    '#options' => $nodetype_page_taxonomy,
+  );
+
+  $form['page_taxonomy_tags'] = array(
+    '#type' => 'select',
+    '#title' => t('Import Tags to vocabulary'),
+    '#description' => t('All categories will be assigned to that vocabulary'),
+    '#default_value' => 'noimport',
+    '#options' => $nodetype_page_taxonomy,
+  );
+*/
+  return $form;
+}
+
+function wordpress_import_form_map_taxonomies_submit(&$form, &$form_state) {
+
+  $form_state['wordpress_import_obj']->options['nodetype_post_tm']['category_fieldname'] = $form_state['values']['post_taxonomy_category'];
+  $form_state['wordpress_import_obj']->options['nodetype_post_tm']['tag_fieldname'] = $form_state['values']['post_taxonomy_tags'];
+
+  // we additionally need to add the vocabulary name here
+  $fn = $form_state['values']['post_taxonomy_category'];
+  if ($fn != 'noimport') {
+    $fi = field_info_field($fn);
+    $form_state['wordpress_import_obj']->options['nodetype_post_tm']['category_vocabulary'] = $fi['settings']['allowed_values'][0]['vocabulary'];
+  }
+
+  $fn = $form_state['values']['post_taxonomy_tags'];
+  if ($fn != 'noimport') {
+    $fi = field_info_field($fn);
+    $form_state['wordpress_import_obj']->options['nodetype_post_tm']['tag_vocabulary'] = $fi['settings']['allowed_values'][0]['vocabulary'];
+  }
+
+  /*
+  $form_state['wordpress_import_obj']->options['nodetype_page_tm']['category_fieldname'] = $form_state['values']['page_taxonomy_category'];
+  $form_state['wordpress_import_obj']->options['nodetype_page_tm']['tag_fieldname'] = $form_state['values']['page_taxonomy_tags'];
+  */
+}
+
+
+function wordpress_import_form_og($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
   $form['informations'] = array(
@@ -507,6 +752,8 @@ function wordpress_import_form_og(&$form, &$form_state) {
     '#description' => t('Show this post to everyone, or only to members of the groups checked above. Posts without any groups are always <em>public</em>.'),
     );
   }
+
+  return $form;
 }
 
 
@@ -516,34 +763,35 @@ function wordpress_import_form_og_submit(&$form, &$form_state) {
 }
 
 
-function wordpress_import_form_mapusers(&$form, &$form_state) {
+function wordpress_import_form_mapusers($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
   // Get Drupal users
-  $sql = "SELECT * FROM {users} ORDER BY name ASC";
+  $sql = "SELECT u.uid, u.name FROM {users} u ORDER BY name ASC";
   $result =  db_query($sql);
+  $found_users = $result->fetchAllAssoc('uid');
 
-  while ($drupal_user = db_fetch_array($result)) {
-    if (!empty($drupal_user['uid'])) {
-      $drupal_users[$drupal_user['uid']] = $drupal_user['name'];
+  foreach ($found_users as $backdrop_user) {
+    if ($backdrop_user->uid != 0) {
+      $backdrop_users[$backdrop_user->uid] = $backdrop_user->name;
     }
   }
 
   if ($wordpress_import->options['usermap_type'] == 'default') {
 
-    $drupal_users = array('newuser' => t('Create new user')) + $drupal_users;
+    $backdrop_users = array('newuser' => t('Create new user')) + $backdrop_users;
 
     $form['defaultuser'] = array(
       '#type' => 'select',
       '#title' => t('Default user'),
       '#description' => t('Map all Wordpress authors to one single Drupal user.'),
-      '#options' => $drupal_users,
+      '#options' => $backdrop_users,
     );
 
   }
   else {
 
-    $drupal_users = array('newuser' => t('Create new user'), 'noimport' => t('Do not import')) + $drupal_users;
+    $backdrop_users = array('newuser' => t('Create new user'), 'noimport' => t('Do not import')) + $backdrop_users;
 
     $form['usermap'] = array(
       '#title' => t('Users mapping'),
@@ -553,15 +801,16 @@ function wordpress_import_form_mapusers(&$form, &$form_state) {
       '#tree' => TRUE
     );
 
-    foreach ($wordpress_import ->usermap as $wp_user => $drupal_user) {
+    foreach ($wordpress_import ->usermap as $wp_user => $backdrop_user) {
       $form['usermap'][$wp_user] = array(
         '#type' => 'select',
         '#title' => $wp_user . ' (' . $wordpress_import->count['author_posts'][$wp_user] . ')',
-        '#options' => $drupal_users,
+        '#options' => $backdrop_users,
       );
     }
-
   }
+
+  return $form;
 }
 
 
@@ -574,8 +823,8 @@ function wordpress_import_form_mapusers_validate(&$form, &$form_state) {
   // Make sure there is something to import
   if (count($form_state['values']['usermap']) > 0) {
     $i = FALSE;
-    foreach ($form_state['values']['usermap'] as $wp_user => $drupal_user) {
-      if ($drupal_user != 'noimport') {
+    foreach ($form_state['values']['usermap'] as $wp_user => $backdrop_user) {
+      if ($backdrop_user != 'noimport') {
         $i = TRUE;
         break;
       }
@@ -604,7 +853,7 @@ function wordpress_import_form_mapusers_submit(&$form, &$form_state) {
 }
 
 
-function wordpress_import_form_newusers(&$form, &$form_state) {
+function wordpress_import_form_newusers($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
   $form['newuser'] = array('#tree' => TRUE);
@@ -625,8 +874,9 @@ function wordpress_import_form_newusers(&$form, &$form_state) {
         $form['newuser'][$key]['mail'] = array('#type' => 'textfield', '#title' => t('E-mail address for Wordpress author %user', array('%user' => $key)));
       }
     }
-
   }
+
+  return $form;
 }
 
 
@@ -638,7 +888,6 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
   }
 
   foreach ($form_state['values']['newuser'] as $key => $value) {
-
     // Check usernames
     if ($error = user_validate_name($value['name'])) {
       form_set_error('newuser]['. $key .'][name', $error);
@@ -651,7 +900,7 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
     }
 
     // Check user emails
-    if ($error = user_validate_mail($value['mail'])) {
+    if ($error = valid_email_address($value['mail'])) {
       form_set_error('newuser]['. $key .'][mail', $error);
     }
     elseif (user_load(array('mail' => $value['mail']))) {
@@ -661,8 +910,8 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
       form_set_error('newuser]['. $key .'][mail', t('Two users have the same mail (!mail).', array('!mail' => $value['mail'])));
     }
 
-    $user['name'][] = strtolower($value['name']);
-    $user['mail'][] = strtolower($value['mail']);
+    $user->name[] = strtolower($value['name']);
+    $user->mail[] = strtolower($value['mail']);
   }
 }
 
@@ -672,9 +921,9 @@ function wordpress_import_form_newusers_submit(&$form, &$form_state) {
 }
 
 
-function wordpress_import_form_ready(&$form, &$form_state) {
+function wordpress_import_form_ready($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
-  
+
   if (function_exists('dpm')) {
     dpm($wordpress_import);
   }
@@ -682,6 +931,8 @@ function wordpress_import_form_ready(&$form, &$form_state) {
   $form['informations'] = array(
    '#value' => t('Wordpress Import configuration is complete. Click "Finish" to launch the import process.'),
   );
+
+  return $form;
 }
 
 
@@ -689,15 +940,17 @@ function wordpress_import_form_ready(&$form, &$form_state) {
 
 function wordpress_import_form_subtask_next(&$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
-  $cache = ctools_object_cache_set('wordpress_import', $form_state['cache name'], $wordpress_import);
+  // $cache = ctools_object_cache_set('wordpress_import', $form_state['cache name'], $wordpress_import);
+  $cache = wordpress_import_form_set_page_cache($form_state['cache name'], $wordpress_import);
 }
 
 
 function wordpress_import_form_subtask_cancel(&$form_state) {
-  ctools_object_cache_clear('wordpress_import', $form_state['cache name']);
+  // ctools_object_cache_clear('wordpress_import', $form_state['cache name']);
+  wordpress_import_form_clear_page_cache($form_state['cache name']);
   $form_state['redirect'] = 'admin/content/wordpress_import';
-  drupal_get_messages();
-  drupal_set_message('Import operation cancelled.');
+  backdrop_get_messages();
+  backdrop_set_message('Import operation cancelled.');
 }
 
 
@@ -707,7 +960,7 @@ function wordpress_import_form_subtask_finish(&$form_state) {
 
   // Prepare images directory
   if ($wordpress_import->options['images'] && !empty($wordpress_import->options['images_dir'])) {
-    file_check_directory($wordpress_import->options['images_dir'], TRUE);
+    file_prepare_directory($wordpress_import->options['images_dir'], TRUE);
   }
 
   // Prepare batch operations
@@ -749,6 +1002,7 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
     $context['results']['password_protected'] = 0;
     $context['results']['created_comments'] = 0;
     $context['results']['created_trackbacks'] = 0;
+    $context['results']['created_items'] = array();
   }
 
   // Create Drupal vocabularies for Wordpress categories and tags and populate them
@@ -788,10 +1042,12 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
   if (!$context['sandbox']['format_done']) {
     $wordpress_import->format = variable_get('wordpress_import_format_id', 0);
     if (!$wordpress_import->format || !filter_formats($wordpress_import->format)) {
-      db_query("INSERT INTO {filter_formats} (name,cache) VALUES ('%s',1)", 'Wordpress format');
+      /*
+      db_query("INSERT INTO {filter_formats} (name,cache) VALUES ('@s',1)", array('@s' => 'Wordpress format'));
       $wordpress_import->format = db_result(db_query("SELECT MAX(format) AS format FROM {filter_formats}"));
-      db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, '%s', %d, %d)", $wordpress_import->format, 'filter', 2, 0);
+      db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (@d1, '@s', @d2, @d3)", array('@d1' => $wordpress_import->format, '@s' => 'filter', '@d2' => 2, '@d3' => 0));
       variable_set('wordpress_import_format_id', $wordpress_import->format);
+      */
     }
     $context['sandbox']['format_done'] = TRUE;
   }
@@ -837,32 +1093,35 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
 
   if (!empty($wordpress_import->data['categories'])) {
 
-    $category_vocabulary_data = array(
-      'name' => t('Wordpress category'),
-      'module' => 'wordpress_import',
-      'multiple' => 1,
-      'nodes' => array($wordpress_import->options['nodetype'] => $wordpress_import->options['nodetype'])
-    );
-
-    $wordpress_import->categories_vocabulary = wordpress_import_create_vocabulary('category', $category_vocabulary_data);
-    $wordpress_import->categories_map = wordpress_import_get_terms($wordpress_import->categories_vocabulary);
+    $wordpress_import->categories_vocabulary = $wordpress_import->options['nodetype_post_tm']['category_vocabulary'];
+    $wordpress_import->categories_map = wordpress_import_get_terms($wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
 
     foreach ($wordpress_import->data['categories'] as $category) {
 
       // Create term if it doesn't exist
       if (empty($wordpress_import->categories_map[$category['cat_name']])) {
-        $term = array(
-          'name' => $category['cat_name'],
-          'description' => $category['category_description'],
-          'vid' => $wordpress_import->categories_vocabulary,
-          );
+        $term = new TaxonomyTerm();
+        $term->name = $category['cat_name'];
+        $term->description = $category['category_description'];
+        $term->vocabulary = $wordpress_import->options['nodetype_post_tm']['category_vocabulary'];
+        $term->parent = 0;
 
         if (!empty($category['category_parent']) && !empty($wordpress_import->categories_map[$category['category_parent']])) {
-          $term['parent'] = $wordpress_import->categories_map[$category['category_parent']];
+          $term->parent = $wordpress_import->categories_map[$category['category_parent']];
         }
 
-        taxonomy_save_term($term);
-        $wordpress_import->categories_map[$category['cat_name']] = $term['tid'];
+        taxonomy_term_save($term);
+        $context['results']['created_items'][] = array('taxonomy_term' => $term->tid);
+
+        // we need to insert the parent to the table manually
+        db_insert('taxonomy_term_hierarchy')
+          ->fields(array(
+            'tid' => $term->tid,
+            'parent' => $term->parent,
+            ))
+          ->execute();
+
+        $wordpress_import->categories_map[$category['cat_name']] = $term->tid;
 
         $context['results']['created_terms']++;
       }
@@ -871,29 +1130,32 @@ function wordpress_import_process_categories_tags(&$wordpress_import, &$context)
 
   if (!empty($wordpress_import->data['tags'])) {
 
-    $tag_vocabulary_data = array(
-      'name' => t('Wordpress tag'),
-      'module' => 'wordpress_import',
-      'tags' => 1,
-      'multiple' => 1,
-      'nodes' => array($wordpress_import->options['nodetype'] => $wordpress_import->options['nodetype'])
-    );
-
-    $wordpress_import->tags_vocabulary = wordpress_import_create_vocabulary('tag', $tag_vocabulary_data);
-    $wordpress_import->tags_map = wordpress_import_get_terms($wordpress_import->tags_vocabulary);
+    $wordpress_import->tags_vocabulary = $wordpress_import->options['nodetype_post_tm']['tag_vocabulary'];
+    $wordpress_import->tags_map = wordpress_import_get_terms($wordpress_import->options['nodetype_post_tm']['tag_vocabulary']);
 
     foreach ($wordpress_import->data['tags'] as $tag => $description) {
 
       // Create term if it doesn't exist
       if (empty($wordpress_import->tags_map[$tag])) {
-        $term = array(
-          'name' => $tag,
-          'description' => $description,
-          'vid' => $wordpress_import->tags_vocabulary,
-          );
+        $term = new TaxonomyTerm();
+        $term->name = $tag;
+        $term->description = $description;
+        $term->vocabulary = $wordpress_import->tags_vocabulary;
+        $term->parent = 0;
 
-        taxonomy_save_term($term);
-        $wordpress_import->tags_map[$tag] = $term['tid'];
+        taxonomy_term_save($term);
+        $context['results']['created_items'][] = array('taxonomy_term' => $term->tid);
+
+        // we need to insert the parent to the table manually
+        db_insert('taxonomy_term_hierarchy')
+          ->fields(array(
+            'tid' => $term->tid,
+            'parent' => '0',
+            ))
+          ->execute();
+
+
+        $wordpress_import->tags_map[$tag] = $term->tid;
 
         $context['results']['created_terms']++;
       }
@@ -967,7 +1229,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
               $reader->read();
               $post['categories'][] = $reader->value;
             }
-            elseif ($reader->getAttribute('domain') == 'tag') {
+            elseif ($reader->getAttribute('domain') == 'post_tag') {
               $reader->read();
               $post['tags'][] = $reader->value;
             }
@@ -988,11 +1250,44 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
             }
           }
           break;
+
+        // get the translations as stored by Stella plugin
+        case 'wp:postmeta':
+          $reader->read();
+          $reader->read();
+          if ($reader->name == 'wp:meta_key') {
+            $reader->read();
+            if (strpos($reader->value, '_title') !== FALSE) {
+              // find the language
+              $components = explode('-', $reader->value);
+              if (isset($components[1])) {
+                $reader->read();
+                $reader->read();
+                $reader->read();
+                $reader->read();
+                $post['translations'][$components[1]]['title'] = $reader->value;
+              }
+            }
+            if (strpos($reader->value, '_body') !== FALSE) {
+              // find the language
+              $components = explode('-', $reader->value);
+              if (isset($components[1])) {
+                $reader->read();
+                $reader->read();
+                $reader->read();
+                $reader->read();
+                $post['translations'][$components[1]]['body'] = $reader->value;
+              }
+            }
+
+          }
+          break;
       }
     }
   }
 
   // Node object setup ---------------------- //
+  // $node = new Node();
   $node = array();
   $node_og = FALSE;
 
@@ -1010,109 +1305,219 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
       return;
   }
 
+  $node = entity_create('node', $node);
+
   // Catch noimport content type flag
-  if ($node['type'] == 'noimport') {
+  if ($node->type == 'noimport') {
     return;
   }
 
   // Node uid (return if we don't want this author)
-  $node['uid'] = $wordpress_import->usermap[$post['author']];
-  if ($node['uid'] == 'noimport' || !ctype_digit($node['uid'])) {
+  $node->uid = $wordpress_import->usermap[$post['author']];
+  if ($node->uid == 'noimport' || !ctype_digit($node->uid)) {
     return;
   }
 
   // Node title
   if (!empty($post['title'])) {
-    $node['title'] = html_entity_decode($post['title'], ENT_COMPAT, 'UTF-8');
+    $node->title = html_entity_decode($post['title'], ENT_COMPAT, 'UTF-8');
   }
   else {
-    $node['title'] = t('Untitled');
+    $node->title = t('Untitled');
+  }
+
+  // we need the language here
+  $node_language = (isset($wordpress_import->options['language']) ? $wordpress_import->options['language'] : LANGUAGE_NONE);
+
+  $node->langcode = $node_language;
+
+  $format = ($post['type'] == 'post') ? $wordpress_import->options['nodetype_post_format'] : $wordpress_import->options['nodetype_page_format'];
+
+  // Process images for this post and replace URLs
+  if ($wordpress_import->options['images']) {
+    wordpress_import_process_post_images($post['content'], $wordpress_import->options['images_dir'], $context);
   }
 
   // Node content
-  $node['body'] = str_replace('<!--more-->', '<!--break-->', $post['content']);
-
-  // Node format
-  $node['format'] = $wordpress_import->format;
-
-  // Node teaser
-  if (empty($post['excerpt'])) {
-    $node['teaser'] = node_teaser($node['body'], $node['format']);
-  }
-  else {
-    $node['teaser'] = $post['excerpt'];
+  $node->body[LANGUAGE_NONE][0]['value'] = str_replace('<!--more-->', '<!--break-->', $post['content']);
+  $node->body[LANGUAGE_NONE][0]['format'] =  $format;
+  if (!empty($post['excerpt'])) {
+    $node->body[LANGUAGE_NONE][0]['summary'] = $post['excerpt'];
   }
 
   // Node language
-  $node['language'] = (isset($wordpress_import->options['language']) ? $wordpress_import->options['language'] : '');
+  $node->language = $node_language;
 
   // Node timestamp
-  $node['created'] = strtotime($post['date']);
-  $node['changed'] = $node['created'];
+  $node->created = strtotime($post['date']);
+  $node->changed = $node->created;
 
   // Node status
   switch ($post['status']) {
     case 'publish':
       if (empty($post['post_password'])) {
-        $node['status'] = 1;
+        $node->status = 1;
       }
       else {
-        $node['status'] = 0;
+        $node->status = 0;
         $context['results']['password_protected']++;
       }
       break;
     default:
-      $node['status'] = 0;
+      $node->status = 0;
   }
 
   // Node promote
   switch ($post['is_sticky']) {
     case '1':
-      $node['promote'] = 1;
+      $node->promote = 1;
       break;
     default:
-      $node['promote'] = 0;
+      $node->promote = 0;
   }
 
   // Node comment status
-  $node['comment'] = $post['comment_status']=='open'?COMMENT_NODE_READ_WRITE:COMMENT_NODE_READ_ONLY;
+  $node->comment = $post['comment_status']=='open'? '2' : '0' ;
 
   // Check if node wasn't already imported
-  $context['sandbox']['node_duplicate'] = node_load(array('created' => $node['created'], 'title' => $node['title'], 'type' => $node['type']));
-  if ($context['sandbox']['node_duplicate']->nid) {
+  $temp_node = NULL;
+  $node_exist = has_node_duplicate($node);
+  if ($node_exist) {
+    // load the node and add the comments
+    $temp_node = node_load($node_exist);
     if (module_exists('comment') && !empty($post['comments'])) {
-      wordpress_import_process_post_comments($post['comments'], $context['sandbox']['node_duplicate']->nid, $wordpress_import->options['disable_trackbacks'], $context);
+      wordpress_import_process_post_comments($post['comments'], $temp_node->nid, $wordpress_import->options['disable_trackbacks'], $context);
     }
-    unset($context['sandbox']['node_duplicate']);
-    unset($context['sandbox']['post']);
+    node_save($temp_node);
     return;
   }
 
+  $node_path = wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']);
+
   // Process link for this post
   if (module_exists('path') && $wordpress_import->options['aliases']) {
-    $node['path'] = wordpress_import_process_post_link($post['link'], $wordpress_import->data['baseurl']);
-    if (module_exists('pathauto')) {
-      $node['pathauto_perform_alias'] = 0;
+    // switch to drupal 7 / backdrop path
+    $path = array (
+      'alias' => $node_path,
+      'langcode' => $node->language,
+      'auto' => FALSE,
+    );
+
+    $node->path = $path;
+  }
+
+  if (module_exists('taxonomy')) {
+    // @todo: find out, why categories_map and tags_map dissapear from $wordpress_import
+    if ($node->type == $wordpress_import->options['nodetype_post']) {
+      if ($wordpress_import->options['nodetype_post_tm']['category_fieldname'] != 'noimport') {
+        // get the category term id and add it to the node
+        if (!empty($post['categories'])) {
+          foreach ($post['categories'] as $key => $value) {
+            $tid = get_term_id($value, $wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
+            if ($tid) {
+              $field_name = $wordpress_import->options['nodetype_post_tm']['category_fieldname'];
+              $field = $node->{$field_name};
+              // $field[LANGUAGE_NONE][]['tid'] = $wordpress_import->categories_map[$value];
+              $field[LANGUAGE_NONE][]['tid'] = $tid;
+              $node->$field_name = $field;
+            }
+          }
+        }
+      }
+      if ($wordpress_import->options['nodetype_post_tm']['tag_fieldname'] != 'noimport') {
+        if (!empty($post['tags'])) {
+          foreach ($post['tags'] as $key => $value) {
+            $tid = get_term_id($value, $wordpress_import->options['nodetype_post_tm']['tag_vocabulary']);
+            if ($tid) {
+              $field_name = $wordpress_import->options['nodetype_post_tm']['tag_fieldname'];
+              $field = $node->{$field_name};
+              // $field[LANGUAGE_NONE][]['tid'] = $wordpress_import->tags_map[$value];
+              $field[LANGUAGE_NONE][]['tid'] = $tid;
+              $node->$field_name = $field;
+            }
+          }
+        }
+      }
     }
   }
 
-  // Process categories and tags for this post
-  if (module_exists('taxonomy') && !(empty($post['categories']) && empty($post['tags']))) {
-    $node['taxonomy'] = wordpress_import_process_post_categories_tags($post['categories'], $wordpress_import->categories_vocabulary, $wordpress_import->categories_map, $post['tags'], $wordpress_import->tags_vocabulary);
-  }
-
-  // Process images for this post
-  if ($wordpress_import->options['images']) {
-    wordpress_import_process_post_images($node['body'], $wordpress_import->options['images_dir'], $context);
-  }
-
   // Save the node
-  $node = (object)$node;
-  node_save($node);
+  $result = node_save($node);
+  $context['results']['created_items'][] = array('node' => $node->nid);
 
   // Process comments and trackbacks for this post
   if (module_exists('comment') && !empty($post['comments'])) {
     wordpress_import_process_post_comments($post['comments'], $node->nid, $wordpress_import->options['disable_trackbacks'], $context);
+  }
+
+  // create the translated nodes
+  if (isset($post['translations'])) {
+
+    if ($temp_node != NULL) {
+      // node already exists, so switch
+      $node = $temp_node;
+    }
+
+    foreach ($post['translations'] as $key => $value) {
+      // Process images for this post and replace URLs
+      if ($wordpress_import->options['images']) {
+        wordpress_import_process_post_images($value['body'], $wordpress_import->options['images_dir'], $context);
+      }
+
+      $tn = new Node();
+      $tn->type = $node->type;
+      $tn->langcode = $key;
+      $tn->title = $value['title'];
+      $tn->uid = $node->uid;
+      $tn->status = $node->status;
+      $tn->created = $node->created;
+      $tn->body[LANGUAGE_NONE][0]['value'] = str_replace('<!--more-->', '<!--break-->', $value['body']);
+      $tn->body[LANGUAGE_NONE][0]['format'] = $format;
+      $tn->comment = $node->comment;
+      $tn->promote = $node->promote;
+      $tn->sticky = $node->sticky;
+      $tn->tnid = $node->nid;
+      if (!$wordpress_import->options['redirect']  && $wordpress_import->options['aliases']) {
+        $tn->path['alias'] = $node->path['alias'];
+        $tn->path['auto'] = FALSE;
+      }
+      $tn->path['langcode'] = $key;
+      if (isset($node->field_category)) {
+        $tn->field_category = $node->field_category;
+      }
+      if (isset($node->field_tags)) {
+        $tn->field_tags = $node->field_tags;
+      }
+
+      if (has_node_duplicate($tn) === FALSE) {
+        node_save($tn);
+        $context['results']['created_nodes']++;
+        $context['results']['created_items'][] = array('node' => $tn->nid);
+
+        // Create redirect for the translated node
+        if (module_exists('redirect') && $wordpress_import->options['redirect']) {
+          wordpress_import_create_redirect($tn, $node_path, $context);
+        }
+
+        // create menu link if $node type is page and selected
+        if ($wordpress_import->options['create_menu_items_page']
+            && $tn->type == $wordpress_import->options['nodetype_page']) {
+          // here we have translated nodes, so use language in options
+          $options = array();
+          $language_list = language_list('enabled');
+          if (isset($language_list[$tn->langcode])) {
+            $options['language'] = $language_list[$tn->langcode];
+          }
+          wordpress_import_create_menu_link($tn, $wordpress_import->options['create_menu_items_page_menu'], $context, FALSE, $options);
+        }
+
+        // we need to set the tnid of the original node, too
+        if ($node->tnid != $node->nid) {
+          $node->tnid = $node->nid;
+          node_save($node);
+        }
+      }
+    }
   }
 
   // Node OG parameters
@@ -1121,6 +1526,29 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
     $node->og_public = (int) $wordpress_import->og_public;
     og_save_ancestry($node);
   }
+
+
+  // Create redirect for this node
+  if (module_exists('redirect') && $wordpress_import->options['redirect']) {
+    wordpress_import_create_redirect($node, $node_path, $context);
+
+    // also create a redirect with no language
+    wordpress_import_create_redirect($node, $node_path, $context, FALSE);
+  }
+
+  // create menu link if $node type is page and selected
+  if ($wordpress_import->options['create_menu_items_page']
+      && $node->type == $wordpress_import->options['nodetype_page']) {
+    $options = array();
+    if ($node->langcode != LANGUAGE_NONE) {
+      $language_list = language_list('enabled');
+      if (isset($language_list[$node->langcode])) {
+        $options['language'] = $language_list[$node->langcode];
+      }
+    }
+    wordpress_import_create_menu_link($node, $wordpress_import->options['create_menu_items_page_menu'], $context, FALSE, $options);
+  }
+
 
   // Update messages infos with nid
   if (!empty($context['sandbox']['downloaded_images']) || !empty($context['sandbox']['error_images'])) {
@@ -1142,6 +1570,10 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   unset($context['sandbox']['post']);
   unset($context['sandbox']['downloaded_images']);
   unset($context['sandbox']['error_images']);
+
+  // store the new generated items to the tempstore
+  // and make it valid for three days
+  wordpress_import_db_set($wordpress_import->import_id , $context['results']['created_items']);
 }
 
 /**
@@ -1164,34 +1596,6 @@ function wordpress_import_process_post_link($link, $baseurl) {
   return $path;
 }
 
-/**
- * Process post categories and tags and associate to taxonomy terms
- */
-function wordpress_import_process_post_categories_tags($categories, $categories_vocabulary, $categories_map, $tags, $tags_vocabulary) {
-
-  $taxonomy = array();
-  $drupal_tags = array();
-
-  // Remove duplicates
-  $categories = array_unique($categories);
-  $tags = array_unique($tags);
-
-  // Process categories
-  foreach ($categories as $category) {
-    $term = $categories_map[$category];
-    if (!empty($term)) {
-        $taxonomy[$categories_vocabulary][] = $term;
-    }
-  }
-
-  // Process tags
-  if (!empty($tags)) {
-    $taxonomy['tags'][$tags_vocabulary] = join(',', $tags);
-  }
-
-  return $taxonomy;
-
-}
 
 /**
  * Process comments and trackbacks for this post
@@ -1223,6 +1627,7 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
           $node_trackback = array(
             'nid' => $nid,
             'created' => strtotime($comment['date']),
+            'changed' => strtotime($comment['date']),
             'site' => $comment['author_IP'],
             'name' => decode_entities(strip_tags($comment['author'])),
             'subject' => trim(truncate_utf8(decode_entities(strip_tags($comment['content'])), 29, TRUE)),
@@ -1243,28 +1648,32 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
         }
         break;
       default:
-        $node_comment = array(
+        $nc = array(
           'nid' => $nid,
           'pid' => 0,
-          'comment' => $comment['content'],
           'subject' => trim(truncate_utf8(decode_entities(strip_tags($comment['content'])), 29, TRUE)),
-          'name' => decode_entities(strip_tags($comment['author'])),
+          'name' => decode_entities(strip_tags(substr($comment['author'], 0, 60))),
           'mail' => $comment['author_email'],
           'homepage' => $comment['author_url'],
-          'timestamp' => strtotime($comment['date']),
+          'created' => strtotime($comment['date']),
+          'changed' => strtotime($comment['date']),
           'hostname' => $comment['author_IP'],
           'status' => $status,
-          'format' => $wordpress_import->format
-          );
+          'format' => $wordpress_import->format,
+        );
+
+        $node_comment = entity_create('comment', $nc);
+        $node_comment->comment_body[LANGUAGE_NONE][0]['value'] = $comment['content'];
+
         // Check if duplicate
         if ($node_duplicate) {
           $c = db_query("SELECT c.cid, c.comment FROM {comments} c WHERE c.nid = %d AND c.timestamp = %d", $node_duplicate->nid, $node_comment['timestamp']);
-          if ($c->cid && $c->comment == $node_comment['comment']) {
+          if ($c->cid && $c->comment == $node_comment['comment_body']) {
             continue 2;
           }
         }
         else {
-          $node_comments[$node_comment['timestamp']] = $node_comment;
+          $node_comments[$node_comment->created] = $node_comment;
         }
         break;
     }
@@ -1292,12 +1701,16 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
   // Save comments
   foreach ($node_comments as $node_comment) {
     $comment_id = comment_save($node_comment);
+    if ($comment_id) {
+      $context['results']['created_items'][] = array('comment' => $comment_id);
+    }
     // Update fields that haven't been set by comment_save
-    db_query("UPDATE {comments} SET hostname= '%s', timestamp= %d, status= %d WHERE cid= %d",
-      $node_comment['hostname'],
-      $node_comment['timestamp'],
-      $node_comment['status'],
-      $comment_id
+    db_query("UPDATE {comment} SET hostname= '@hn', created= @ts, status= @st WHERE cid= @id", array(
+      '@hn' => $node_comment->hostname,
+      '@ts' => $node_comment->timestamp,
+      '@st' => $node_comment->status,
+      '@id' => $comment_id
+      )
       );
     $context['results']['created_comments']++;
   }
@@ -1346,18 +1759,23 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
 
         if ($imgnewurl) {
 
-          // Download image
-          $imgfile = file_create_filename(urldecode($imginfo['basename']), $images_dir);
-          $imgout = fopen($imgfile, 'wb');
-          $ch = curl_init($imgnewurl);
-          curl_setopt($ch, CURLOPT_HEADER, FALSE);
-          curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-          curl_setopt($ch, CURLOPT_FILE, $imgout);
-          curl_exec($ch);
-          curl_close($ch);
-          fclose($imgout);
+          // Download image if it not exists
+          $new_file_name = $images_dir . '/' . $imginfo['basename'];
+          if (!file_exists($new_file_name)) {
+            $imgfile = file_create_filename(urldecode($imginfo['basename']), $images_dir);
+            $imgout = fopen($imgfile, 'wb');
+            $ch = curl_init($imgnewurl);
+            curl_setopt($ch, CURLOPT_HEADER, FALSE);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_FILE, $imgout);
+            curl_exec($ch);
+            curl_close($ch);
+            fclose($imgout);
+          }
 
-          $newurl = $base_path . $images_dir . '/' . $imginfo['basename'];
+          $rel_dir = str_replace('.', '', $images_dir);
+
+          $newurl = /* $base_path . */ $rel_dir . '/' . $imginfo['basename'];
 
           // Replace image URL with new path in post
           $body = str_replace($imgurl, $newurl, $body);
@@ -1388,10 +1806,10 @@ function wordpress_import_batch_finished($success, $results, $operations) {
     $msg_results[] = '<li>' . t('@created_trackbacks trackbacks', array('@created_trackbacks' => $results['created_trackbacks'])) . '</li>';
     $msg_results[] = '<li>' . t('@downloaded_images/@total_images images', array('@downloaded_images' => count($results['downloaded_images']), '@total_images' => count($results['downloaded_images'])+count($results['error_images']))) . '</li>';
 
-    drupal_set_message($message . '<ul>' . join("\n", $msg_results) . '</ul>');
-    
+    backdrop_set_message($message . '<ul>' . join("\n", $msg_results) . '</ul>');
+
     if (function_exists('dpm')) {
-      dpm($results['error_images']);
+      // dpm($results['error_images']);
     }
 
     if (count($results['error_images']) > 0) {
@@ -1400,17 +1818,17 @@ function wordpress_import_batch_finished($success, $results, $operations) {
       foreach ($results['error_images'] as $error_image) {
         $errors .= '<li>' . l($error_image['title'], 'node/' . $error_image['nid']) . "</li>\n";
       }
-      drupal_set_message(t('Some images could not be transferred for these nodes :') . '<ul>' . $errors . '</ul>', 'warning');
+      backdrop_set_message(t('Some images could not be transferred for these nodes :') . '<ul>' . $errors . '</ul>', 'warning');
     }
-    
+
     if ($results['password_protected'] > 0) {
-      drupal_set_message(t('Encountered @password_protected password-protected posts. These were imported as unpublished nodes.', array('@password_protected' => $results['password_protected'])), 'warning');
+      backdrop_set_message(t('Encountered @password_protected password-protected posts. These were imported as unpublished nodes.', array('@password_protected' => $results['password_protected'])), 'warning');
     }
 
   }
   else {
 
-    drupal_set_message(t('Import failed.'), 'error');
+    backdrop_set_message(t('Import failed.'), 'error');
 
   }
 
@@ -1511,43 +1929,188 @@ function wordpress_import_read_wxr(&$wordpress_import) {
   return $is_wxr_file && $is_valid_xml;
 }
 
-/**
- * Create a Drupal vocabulary and return it's vid.
- */
-function wordpress_import_create_vocabulary($type, $vocabulary_data) {
-
-  $vocabulary = FALSE;
-
-  // Check if a category for Wordpress already exists
-  $vocabulary_id = variable_get('wordpress_import_'. $type, 0);
-
-  if ($vocabulary_id) {
-    $vocabulary = taxonomy_vocabulary_load($vocabulary_id);
-  }
-
-  if ($vocabulary) {
-    return $vocabulary->vid;
-  }
-  else {
-    taxonomy_save_vocabulary($vocabulary_data);
-    variable_set('wordpress_import_'. $type, $vocabulary_data['vid']);
-    return $vocabulary_data['vid'];
-  }
-}
 
 /**
  * Return an array of taxonomy terms belonging to a vocabulary
  */
 function wordpress_import_get_terms($vid) {
-  $db_result = db_query("SELECT t.tid, t.* FROM {term_data} t WHERE t.vid = %d", $vid);
+  $db_result = db_query('SELECT t.tid, t.name FROM {taxonomy_term_data} t WHERE t.vocabulary = :vid', array(':vid' => $vid))->fetchAll();
 
   $result = array();
-  while ($term = db_fetch_object($db_result)) {
+  foreach ($db_result as $term) {
     $result[$term->name] = $term->tid;
   }
 
   return $result;
 }
+
+
+
+function wordpress_import_create_redirect($node, $path, &$context, $with_lang = TRUE) {
+  $redirect = new Redirect();
+  if ($with_lang) {
+    $redirect->langcode = $node->langcode;
+  }
+  else {
+    $redirect->langcode = LANGUAGE_NONE;
+  }
+
+  $redirect->source = $path;
+  $redirect->redirect = 'node/' . $node->nid;;
+
+  $result = redirect_save($redirect);
+  if (($result == SAVED_NEW) || ($result == SAVED_UPDATED)) {
+    $context['results']['created_items'][] = array('redirect' => $redirect->rid);
+  }
+}
+
+function wordpress_import_create_menu_link($node, $menu_name, &$context, $expanded = FALSE, $options = array()) {
+  $item = array(
+    'link_path' => 'node/' . $node->nid,
+    'link_title' => empty($node->title) ? 'Untitled' : $node->title,
+    'menu_name' => $menu_name,
+    // 'expanded' => $expanded,
+    'options' => $options,
+  );
+  $mid = menu_link_save($item);
+  if ($mid) {
+    $context['results']['created_items'][] = array('menu_link' => $mid);
+  }
+}
+
+function wordpress_rollback_form($form, &$form_state) {
+
+  $result = db_select('wordpress_import', 'w')
+                    ->fields('w', array('iid', 'identifier'))
+                    ->execute();
+
+  $options = array();
+  while($record = $result->fetchAssoc()) {
+    $options[$record['iid']] = $record['identifier'];
+  }
+
+  $form['rollback_select'] = array(
+    '#type' => 'radios',
+    '#options' => $options,
+    '#title' => t('Select the import you want to roll back.'),
+  );
+  $form['rollback_submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Rollback',
+  );
+  return $form;
+}
+
+
+function wordpress_rollback_form_submit($form, &$form_state) {
+  $selected_rollback = $form_state['values']['rollback_select'];
+
+  if (!empty($selected_rollback)) {
+    wordpress_import_rollback($selected_rollback);
+  }
+  else {
+    backdrop_set_message('Please select a rollback', 'warning');
+  }
+}
+
+
+function wordpress_rollback_edit_form($form, &$form_state) {
+
+  $result = db_select('wordpress_import', 'w')
+                    ->fields('w', array('iid', 'identifier'))
+                    ->execute();
+
+  $options = array();
+  while($record = $result->fetchAssoc()) {
+    $options[$record['iid']] = $record['identifier'];
+  }
+
+  $form['rollback_delete_select'] = array(
+    '#type' => 'checkboxes',
+    '#options' => $options,
+    '#title' => t('Select the import you want to delete.'),
+  );
+  $form['rollback_submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Delete',
+  );
+
+  return $form;
+}
+
+
+function wordpress_rollback_edit_form_submit($form, &$form_state) {
+  $selected_rollback = $form_state['values']['rollback_delete_select'];
+
+  $ids = array();
+  foreach ($selected_rollback as $key => $value) {
+    if ($value != 0) {
+      $ids[] = $key;
+    }
+  }
+
+  if (!empty($ids)) {
+    wordpress_import_db_clear($ids);
+  }
+  else {
+    backdrop_set_message('Please select a rollback', 'warning');
+  }
+}
+
+
+/**
+ * Process the rollback of the import in a batch.
+ * @return [type] [description]
+ */
+function wordpress_import_rollback($rollback_id) {
+
+  $created_items = wordpress_import_db_get($rollback_id);
+  if (empty($created_items)) {
+    return;
+  }
+
+  // setup the batch
+  $operations = array();
+  $counter++;
+  foreach ($created_items as $key => $value) {
+    $item_type = key($value);
+    $item_id = $value[$item_type];
+
+    $operations[] = array(
+      'wordpress_import_rollback_callback',
+      array(
+        $item_type,
+        $item_id,
+      ),
+    );
+  }
+
+  $batch = array(
+    'operations' => $operations,
+    'finished' => 'wordpress_import_rollback_finished',
+    'title' => t('Wordpress import'),
+    'init_message' => t('Wordpress import rollback is starting processing'),
+    'progress_message' => t('Processed @current out of @total.'),
+    'error_message' => t('Wordpress import has encountered an error.'),
+  );
+  batch_set($batch);
+  batch_process('/admin/content/wordpress_import');
+}
+
+function wordpress_import_rollback_callback($item_type, $item_id, &$context) {
+
+  $function = $item_type . '_delete';
+  if(function_exists($function)) {
+    $function($item_id);
+  }
+}
+
+function wordpress_import_rollback_finished($success, $results, $operations) {
+  if ($success) {
+    backdrop_set_message('Rollback successful');
+  }
+}
+
 
 /**
  * cURL helper function since PHP has disabled redirection support.
@@ -1594,4 +2157,84 @@ function curl_redir_url($ch) {
       $curl_loops = 0;
       return FALSE;
     }
+}
+
+
+function file_directory_path() {
+  return variable_get('file_public_path', conf_path() . '/files');
+}
+
+
+/**
+ * Helper function to find duplicate nodes
+ *
+ * @param node $node the node to search for
+ *
+ * @return mixed FALSE if node is not found, nid otherwise.
+ */
+function has_node_duplicate($node) {
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'node');
+  $query->propertyCondition('title', $node->title, '=');
+  $query->propertyCondition('created', $node->created, '=');
+  $query->propertyCondition('type', $node->type, '=');
+  $query->propertyCondition('langcode', $node->langcode, '=');
+
+  $ids = $query->execute();
+
+  if (isset($ids['node'])) {
+    $ids = array_keys($ids['node']);
+    $id = array_shift($ids);
+    return $id;
+  }
+
+  return FALSE;
+}
+
+
+/**
+ * Helper function to find term id for a name
+ *
+ * @param string $$name the node to search for
+ *
+ * @return mixed FALSE if name is not found, tid otherwise.
+ */
+function get_term_id($name, $vid) {
+  $result = db_query('SELECT t.tid FROM {taxonomy_term_data} t WHERE t.name = :name AND t.vocabulary = :vocab', array(':name' => $name, ':vocab' => $vid))->fetchAll();
+
+  return empty($result) ? FALSE : $result[0]->tid;
+}
+
+
+function wordpress_import_db_create($identifier) {
+  $iid = db_insert('wordpress_import')
+    ->fields(array(
+      'identifier' => $identifier,
+      'value' => serialize(array()),
+    ))
+    ->execute();
+
+    return $iid;
+}
+
+
+function wordpress_import_db_set($id, $value) {
+  db_update('wordpress_import')
+    ->fields(array('value' => serialize($value)))
+    ->condition('iid', $id)
+    ->execute();
+}
+
+function wordpress_import_db_get($id) {
+  $data = db_query('SELECT * FROM {wordpress_import} WHERE iid = :id', array(':id' => $id))->fetchObject();
+  if ($data) {
+    $data = unserialize($data->value);
+  }
+  return $data;
+}
+
+function wordpress_import_db_clear($id) {
+  db_delete('wordpress_import')
+    ->condition('iid', ($id), 'IN')
+    ->execute();
 }
