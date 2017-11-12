@@ -910,8 +910,8 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
       form_set_error('newuser]['. $key .'][mail', t('Two users have the same mail (!mail).', array('!mail' => $value['mail'])));
     }
 
-    $user->name[] = strtolower($value['name']);
-    $user->mail[] = strtolower($value['mail']);
+    // $user->name[] = strtolower($value['name']);
+    // $user->mail[] = strtolower($value['mail']);
   }
 }
 
@@ -1016,7 +1016,9 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
       if ($wordpress_import->options['usermap_type'] == 'default' && !empty($wordpress_import->newuser['default'])) {
 
       // Create new default Drupal user and assign uid to each Wordpress author
-      $defaultuser = array('mail' => $wordpress_import->newuser['default']['mail'], 'pass' => user_password(), 'name' => $wordpress_import->newuser['default']['name'], 'status' => 1);
+      // check if a password is set
+      $password = empty($wordpress_import->newuser['default']['password']) ? user_password() : $wordpress_import->newuser['default']['password'];
+      $defaultuser = array('mail' => $wordpress_import->newuser['default']['mail'], 'pass' => $password, 'name' => $wordpress_import->newuser['default']['name'], 'status' => 1);
       $defaultuser = user_save('', $defaultuser);
       $context['results']['created_users']++;
 
