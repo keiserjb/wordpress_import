@@ -881,12 +881,13 @@ function wordpress_import_form_newusers($form, &$form_state) {
 
 
 function wordpress_import_form_newusers_validate(&$form, &$form_state) {
-  global $user;
 
   if ($form_state['clicked_button']['#wizard type'] == 'cancel') {
     return;
   }
 
+  $new_user_names = array();
+  $new_user_mails = array();
   foreach ($form_state['values']['newuser'] as $key => $value) {
     // Check usernames
     if ($error = user_validate_name($value['name'])) {
@@ -895,7 +896,7 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
     elseif (user_load_by_name($value['name'])) {
       form_set_error('newuser]['. $key .'][name', t('User !user already exists.', array('!user' => $value['name'])));
     }
-    elseif (is_array($user['name']) && in_array(strtolower($value['name']), $user['name'])) {
+    elseif (!empty($new_user_names) && in_array(strtolower($value['name']), $new_user_names)) {
       form_set_error('newuser]['. $key .'][name', t('Two users have the same name (!user).', array('!user' => $value['name'])));
     }
 
@@ -906,12 +907,12 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
     elseif (user_load_by_mail($value['mail'])) {
       form_set_error('newuser]['. $key .'][mail', t('User with mail !mail already exists.', array('!mail' => $value['mail'])));
     }
-    elseif (is_array($user['mail']) && in_array(strtolower($value['mail']), $user['mail'])) {
+    elseif (!empty($new_user_mails) && in_array(strtolower($value['mail']), $new_user_mails)) {
       form_set_error('newuser]['. $key .'][mail', t('Two users have the same mail (!mail).', array('!mail' => $value['mail'])));
     }
 
-    // $user->name[] = strtolower($value['name']);
-    // $user->mail[] = strtolower($value['mail']);
+    $new_user_names[] = strtolower($value['name']);
+    $new_user_mails[] = strtolower($value['mail']);
   }
 }
 
