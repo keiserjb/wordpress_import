@@ -1028,6 +1028,9 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
       $defaultuser = user_save('', $defaultuser);
       $context['results']['created_users']++;
 
+      // add user to created items for rollback
+      $context['results']['created_items'][] = array('user' => $defaultuser->uid);
+
       foreach ($wordpress_import->usermap as $key => $value) {
         $wordpress_import->usermap[$key] = $defaultuser->uid;
       }
@@ -1049,6 +1052,9 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
         $user = user_save('', $user);
         $wordpress_import->usermap[$key] = $user->uid;
         $context['results']['created_users']++;
+
+        // add user to created items for rollback
+        $context['results']['created_items'][] = array('user' => $user->uid);
       }
     }
     $context['sandbox']['users_done'] = TRUE;
