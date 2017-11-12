@@ -1004,6 +1004,9 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
     $context['results']['created_comments'] = 0;
     $context['results']['created_trackbacks'] = 0;
     $context['results']['created_items'] = array();
+
+    // store usermapping in context, because it seems to get lost here
+    $context['sandbox']['usermap'] = $wordpress_import->usermap;
   }
 
   // Create Drupal vocabularies for Wordpress categories and tags and populate them
@@ -1033,7 +1036,7 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
       $context['results']['created_items'][] = array('user' => $defaultuser->uid);
 
       foreach ($wordpress_import->usermap as $key => $value) {
-        $wordpress_import->usermap[$key] = $defaultuser->uid;
+        $context['sandbox']['usermap'][$key] = $defaultuser->uid;
       }
 
     }
@@ -1048,10 +1051,15 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
         $user->mail = $value['mail'];
         $user->pass = $password;
         $user->name = $value['name'];
+        $user->isNew = TRUE;
         $user->status = 1;
 
-        $user = user_save($user);
-        $wordpress_import->usermap[$key] = $user->uid;
+        user_save($user);
+
+        // seems like we have to reload the user again
+        $user = user_load_by_mail($value['mail']);
+
+        $context['sandbox']['usermap'][$key] = $user->uid;
         $context['results']['created_users']++;
 
         // add user to created items for rollback
@@ -1334,9 +1342,9 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   if ($node->type == 'noimport') {
     return;
   }
-
+dpm($context['sandbox']['usermap'][$post['author']]);
   // Node uid (return if we don't want this author)
-  $node->uid = $wordpress_import->usermap[$post['author']];
+  $node->uid = $context['sandbox']['usermap'][$post['author']];
   if ($node->uid == 'noimport' || !ctype_digit($node->uid)) {
     return;
   }
