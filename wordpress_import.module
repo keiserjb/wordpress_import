@@ -892,7 +892,7 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
     if ($error = user_validate_name($value['name'])) {
       form_set_error('newuser]['. $key .'][name', $error);
     }
-    elseif (user_load(array('name' => $value['name']))) {
+    elseif (user_load_by_name($value['name'])) {
       form_set_error('newuser]['. $key .'][name', t('User !user already exists.', array('!user' => $value['name'])));
     }
     elseif (is_array($user['name']) && in_array(strtolower($value['name']), $user['name'])) {
@@ -903,7 +903,7 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
     if ($error = valid_email_address($value['mail'])) {
       form_set_error('newuser]['. $key .'][mail', $error);
     }
-    elseif (user_load(array('mail' => $value['mail']))) {
+    elseif (user_load_by_mail($value['mail'])) {
       form_set_error('newuser]['. $key .'][mail', t('User with mail !mail already exists.', array('!mail' => $value['mail'])));
     }
     elseif (is_array($user['mail']) && in_array(strtolower($value['mail']), $user['mail'])) {
@@ -1021,9 +1021,9 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
 
       $defaultuser = new User();
       $defaultuser->mail = $wordpress_import->newuser['default']['mail'];
-      $defaultuser->pass => $password;
-      $defaultuser->name => $wordpress_import->newuser['default']['name'];
-      $defaultuser->status => 1;
+      $defaultuser->pass = $password;
+      $defaultuser->name = $wordpress_import->newuser['default']['name'];
+      $defaultuser->status = 1;
 
       $defaultuser = user_save('', $defaultuser);
       $context['results']['created_users']++;
@@ -1045,9 +1045,9 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
 
         $user = new User();
         $user->mail = $wordpress_import->newuser['default']['mail'];
-        $user->pass => $password;
-        $user->name => $wordpress_import->newuser['default']['name'];
-        $user->status => 1;
+        $user->pass = $password;
+        $user->name = $wordpress_import->newuser['default']['name'];
+        $user->status = 1;
 
         $user = user_save('', $user);
         $wordpress_import->usermap[$key] = $user->uid;
