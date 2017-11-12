@@ -863,15 +863,15 @@ function wordpress_import_form_newusers($form, &$form_state) {
     $form['newuser']['default'] = array('#type' => 'fieldset', '#title' => t('All Wordpress authors'));
     $form['newuser']['default']['name'] = array('#type' => 'textfield', '#title' => t('Username for new user'));
     $form['newuser']['default']['mail'] = array('#type' => 'textfield', '#title' => t('E-mail address for new user'));
-
+    $form['newuser']['default']['password'] = array('#type' => 'textfield', '#title' => t('Password for new user'));
   }
   else {
-
     foreach ($wordpress_import->usermap as $key => $value) {
       if ($value == 'newuser') {
         $form['newuser'][$key] = array('#type' => 'fieldset', '#title' => t('Wordpress author %user', array('%user' => $key)));
         $form['newuser'][$key]['name'] = array('#type' => 'textfield', '#title' => t('Username for Wordpress author %user', array('%user' => $key)), '#default_value' => $key);
         $form['newuser'][$key]['mail'] = array('#type' => 'textfield', '#title' => t('E-mail address for Wordpress author %user', array('%user' => $key)));
+        $form['newuser'][$key]['password'] = array('#type' => 'textfield', '#title' => t('Password for Wordpress author %user', array('%user' => $key)));
       }
     }
   }
