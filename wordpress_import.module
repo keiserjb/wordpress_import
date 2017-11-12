@@ -1018,7 +1018,13 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
       // Create new default Drupal user and assign uid to each Wordpress author
       // check if a password is set
       $password = empty($wordpress_import->newuser['default']['password']) ? user_password() : $wordpress_import->newuser['default']['password'];
-      $defaultuser = array('mail' => $wordpress_import->newuser['default']['mail'], 'pass' => $password, 'name' => $wordpress_import->newuser['default']['name'], 'status' => 1);
+
+      $defaultuser = new User();
+      $defaultuser->mail = $wordpress_import->newuser['default']['mail'];
+      $defaultuser->pass => $password;
+      $defaultuser->name => $wordpress_import->newuser['default']['name'];
+      $defaultuser->status => 1;
+
       $defaultuser = user_save('', $defaultuser);
       $context['results']['created_users']++;
 
@@ -1031,7 +1037,15 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
 
       // Create new Drupal users as required and assign uid to corresponding Wordpress author
       foreach ($wordpress_import->newuser as $key => $value) {
-        $user = array('mail' => $value['mail'], 'pass' => user_password(), 'name' => $value['name'], 'status' => 1);
+
+        $password = empty($value['password']) ? user_password() : $value['password'];
+
+        $user = new User();
+        $user->mail = $wordpress_import->newuser['default']['mail'];
+        $user->pass => $password;
+        $user->name => $wordpress_import->newuser['default']['name'];
+        $user->status => 1;
+
         $user = user_save('', $user);
         $wordpress_import->usermap[$key] = $user->uid;
         $context['results']['created_users']++;
