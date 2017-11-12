@@ -801,7 +801,7 @@ function wordpress_import_form_mapusers($form, &$form_state) {
       '#tree' => TRUE
     );
 
-    foreach ($wordpress_import ->usermap as $wp_user => $backdrop_user) {
+    foreach ($wordpress_import->usermap as $wp_user => $backdrop_user) {
       $form['usermap'][$wp_user] = array(
         '#type' => 'select',
         '#title' => $wp_user . ' (' . $wordpress_import->count['author_posts'][$wp_user] . ')',
