@@ -901,8 +901,8 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
     }
 
     // Check user emails
-    if ($error = valid_email_address($value['mail'])) {
-      form_set_error('newuser]['. $key .'][mail', $error);
+    if (!valid_email_address($value['mail'])) {
+      form_set_error('newuser]['. $key .'][mail', 'Thhis is not a valid email adress.');
     }
     elseif (user_load_by_mail($value['mail'])) {
       form_set_error('newuser]['. $key .'][mail', t('User with mail !mail already exists.', array('!mail' => $value['mail'])));
@@ -1026,7 +1026,7 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
       $defaultuser->name = $wordpress_import->newuser['default']['name'];
       $defaultuser->status = 1;
 
-      $defaultuser = user_save('', $defaultuser);
+      $defaultuser = user_save($defaultuser);
       $context['results']['created_users']++;
 
       // add user to created items for rollback
@@ -1045,12 +1045,12 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
         $password = empty($value['password']) ? user_password() : $value['password'];
 
         $user = new User();
-        $user->mail = $wordpress_import->newuser['default']['mail'];
+        $user->mail = $value['mail'];
         $user->pass = $password;
-        $user->name = $wordpress_import->newuser['default']['name'];
+        $user->name = $value['name'];
         $user->status = 1;
 
-        $user = user_save('', $user);
+        $user = user_save($user);
         $wordpress_import->usermap[$key] = $user->uid;
         $context['results']['created_users']++;
 
