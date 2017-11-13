@@ -77,10 +77,9 @@ function wordpress_import_menu() {
 }
 
 /**
- * hook_perm
+ * Implements hook_permission().
  *
- * @return array perms
- * @author Yann Rocq
+ * @return array permissions
  **/
 function wordpress_import_permission() {
   return array(
