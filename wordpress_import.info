@@ -4,7 +4,6 @@ package = "Wordpress Import"
 dependencies[] = form_wizard
 type = module
 
-; Information added by drupal.org packaging script on 2013-10-26
 version = "1.x-1.x-dev"
 backdrop = "1.x"
 
