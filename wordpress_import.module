@@ -502,7 +502,7 @@ function wordpress_import_form_options($form, &$form_state) {
     '#type' => 'textfield',
     '#title' => t('Images directory'),
     '#default_value' => '/wp_images',
-    '#description' => t('Subdirectory of <strong>@file_directory_path</strong> in which to place files, must start with /', array('@file_directory_path' => file_directory_path())),
+    '#description' => t('Subdirectory of <strong>@wordpress_import_file_directory_path</strong> in which to place files, must start with /', array('@wordpress_import_file_directory_path' => wordpress_import_file_directory_path())),
   );
 
   // Warn if some key modules are not found
@@ -586,7 +586,7 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
 
   // Test if images directory is valid
   if ($form_state['values']['advanced_options']['images']) {
-    $dir = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
+    $dir = wordpress_import_file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
 
     if (!is_dir($dir)) {
       if (!backdrop_mkdir($dir)) {
@@ -606,7 +606,7 @@ function wordpress_import_form_options_submit(&$form, &$form_state) {
   // Clear messages
   backdrop_get_messages();
 
-  $form_state['values']['advanced_options']['images_dir'] = file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
+  $form_state['values']['advanced_options']['images_dir'] = wordpress_import_file_directory_path() . rtrim($form_state['values']['advanced_options']['images_dir'], '/\\');
 
   $options = $form_state['values']['basic_options'] + $form_state['values']['advanced_options'];
   $form_state['wordpress_import_obj']->options = $options;
@@ -1395,7 +1395,7 @@ dpm($context['sandbox']['usermap'][$post['author']]);
 
   // Check if node wasn't already imported
   $temp_node = NULL;
-  $node_exist = has_node_duplicate($node);
+  $node_exist = wordpress_import_has_node_duplicate($node);
   if ($node_exist) {
     // load the node and add the comments
     $temp_node = node_load($node_exist);
@@ -1427,7 +1427,7 @@ dpm($context['sandbox']['usermap'][$post['author']]);
         // get the category term id and add it to the node
         if (!empty($post['categories'])) {
           foreach ($post['categories'] as $key => $value) {
-            $tid = get_term_id($value, $wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
+            $tid = wordpress_import_get_term_id($value, $wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
             if ($tid) {
               $field_name = $wordpress_import->options['nodetype_post_tm']['category_fieldname'];
               $field = $node->{$field_name};
@@ -1441,7 +1441,7 @@ dpm($context['sandbox']['usermap'][$post['author']]);
       if ($wordpress_import->options['nodetype_post_tm']['tag_fieldname'] != 'noimport') {
         if (!empty($post['tags'])) {
           foreach ($post['tags'] as $key => $value) {
-            $tid = get_term_id($value, $wordpress_import->options['nodetype_post_tm']['tag_vocabulary']);
+            $tid = wordpress_import_get_term_id($value, $wordpress_import->options['nodetype_post_tm']['tag_vocabulary']);
             if ($tid) {
               $field_name = $wordpress_import->options['nodetype_post_tm']['tag_fieldname'];
               $field = $node->{$field_name};
@@ -1503,7 +1503,7 @@ dpm($context['sandbox']['usermap'][$post['author']]);
         $tn->field_tags = $node->field_tags;
       }
 
-      if (has_node_duplicate($tn) === FALSE) {
+      if (wordpress_import_has_node_duplicate($tn) === FALSE) {
         node_save($tn);
         $context['results']['created_nodes']++;
         $context['results']['created_items'][] = array('node' => $tn->nid);
@@ -1768,7 +1768,7 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
         // Obtain new URL in case of redirections
-        $imgnewurl = curl_redir_url($ch);
+        $imgnewurl = wordpress_import_curl_redir_url($ch);
         curl_close($ch);
 
         if ($imgnewurl) {
@@ -2130,7 +2130,7 @@ function wordpress_import_rollback_finished($success, $results, $operations) {
  * cURL helper function since PHP has disabled redirection support.
  * Taken from http://www.php.net/manual/en/function.curl-setopt.php#71313
  */
-function curl_redir_url($ch) {
+function wordpress_import_curl_redir_url($ch) {
     static $curl_loops = 0;
     static $curl_max_loops = 20;
     if ($curl_loops++ >= $curl_max_loops) {
@@ -2161,7 +2161,7 @@ function curl_redir_url($ch) {
         $new_url = $url['scheme'] . '://' . $url['host'] . $url['path'] . ($url['query'] ? '?' . $url['query'] : '');
         curl_setopt($ch, CURLOPT_URL, $new_url);
         //debug('Redirecting to', $new_url);
-        return curl_redir_url($ch);
+        return wordpress_import_curl_redir_url($ch);
     }
     elseif ($http_code == 200) {
       $curl_loops = 0;
@@ -2174,7 +2174,7 @@ function curl_redir_url($ch) {
 }
 
 
-function file_directory_path() {
+function wordpress_import_file_directory_path() {
   return variable_get('file_public_path', conf_path() . '/files');
 }
 
@@ -2186,7 +2186,7 @@ function file_directory_path() {
  *
  * @return mixed FALSE if node is not found, nid otherwise.
  */
-function has_node_duplicate($node) {
+function wordpress_import_has_node_duplicate($node) {
   $query = new EntityFieldQuery();
   $query->entityCondition('entity_type', 'node');
   $query->propertyCondition('title', $node->title, '=');
@@ -2213,7 +2213,7 @@ function has_node_duplicate($node) {
  *
  * @return mixed FALSE if name is not found, tid otherwise.
  */
-function get_term_id($name, $vid) {
+function wordpress_import_get_term_id($name, $vid) {
   $result = db_query('SELECT t.tid FROM {taxonomy_term_data} t WHERE t.name = :name AND t.vocabulary = :vocab', array(':name' => $name, ':vocab' => $vid))->fetchAll();
 
   return empty($result) ? FALSE : $result[0]->tid;
