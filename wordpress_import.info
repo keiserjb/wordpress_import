@@ -3,8 +3,3 @@ description = "Import WXR files created by Wordpress blog tool."
 package = "Wordpress Import"
 dependencies[] = form_wizard
 type = module
-
-version = "1.x-1.x-dev"
-backdrop = "1.x"
-
-
