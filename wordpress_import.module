@@ -221,7 +221,11 @@ function wordpress_import_form_set_page_cache($name, $page) {
 
 /*-------------------------- Form Steps  ---------------------- */
 
-// function wordpress_import_form_file(&$form, &$form_state) {
+/**
+ * First form step:
+ * Handling of the WXR file. Either upload a file or select
+ * an already uploaded file stored in the created folder.
+ */
 function wordpress_import_form_file($form, &$form_state) {
   global $base_path;
 
@@ -279,6 +283,9 @@ function wordpress_import_form_file($form, &$form_state) {
 }
 
 
+/**
+ * Validation of the first firm step.
+ */
 function wordpress_import_form_file_validate(&$form, &$form_state) {
 
   if ($form_state['clicked_button']['#wizard type'] == 'cancel') {
@@ -318,6 +325,9 @@ function wordpress_import_form_file_validate(&$form, &$form_state) {
 }
 
 
+/**
+ * Submit handler of the first form step.
+ */
 function wordpress_import_form_file_submit(&$form, &$form_state) {
   (!empty($form_state['values']['upload'])) ? ($filesource = t('uploaded')) : ($filesource = t('local'));
   $fileinfo = pathinfo($form_state['wordpress_import_obj']->filepath);
@@ -334,17 +344,22 @@ function wordpress_import_form_file_submit(&$form, &$form_state) {
   $msg_found[] = '<li>' . t('@found_tags tags', array('@found_tags' => $form_state['wordpress_import_obj']->count['tags'])) . '</li>';
 
   backdrop_set_message($message . '<ul>' . join("\n", $msg_found) . '</ul>');
-/*
-  if (function_exists('dpm')) {
-    dpm($form_state['wordpress_import_obj']->data);
-  }
-*/
+
   // create database entry
   $iid = wordpress_import_db_create($form_state['values']['import_id']);
   $form_state['wordpress_import_obj']->import_id = $iid;
 }
 
 
+/**
+ * Second form step:
+ * Set options and advanced import options.
+ * Options are:
+ *     content type mapping
+ *     language selection
+ *     select, what to import
+ *     choose creation of path alias or redirects
+ */
 function wordpress_import_form_options($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
@@ -544,6 +559,9 @@ function wordpress_import_form_options($form, &$form_state) {
 }
 
 
+/**
+ * Validation of second form step.
+ */
 function wordpress_import_form_options_validate(&$form, &$form_state) {
 
   if ($form_state['clicked_button']['#wizard type'] == 'cancel') {
@@ -601,6 +619,9 @@ function wordpress_import_form_options_validate(&$form, &$form_state) {
 }
 
 
+/**
+ * Submit handler of second form step.
+ */
 function wordpress_import_form_options_submit(&$form, &$form_state) {
 
   // Clear messages
@@ -623,6 +644,10 @@ function wordpress_import_form_options_submit(&$form, &$form_state) {
 }
 
 
+/**
+ * Third form step:
+ *   Select mapping of the vocabularies.
+ */
 function wordpress_import_form_map_taxonomies($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
@@ -688,6 +713,10 @@ function wordpress_import_form_map_taxonomies($form, &$form_state) {
   return $form;
 }
 
+
+/**
+ * Submit handler of third form step.
+ */
 function wordpress_import_form_map_taxonomies_submit(&$form, &$form_state) {
 
   $form_state['wordpress_import_obj']->options['nodetype_post_tm']['category_fieldname'] = $form_state['values']['post_taxonomy_category'];
@@ -713,6 +742,11 @@ function wordpress_import_form_map_taxonomies_submit(&$form, &$form_state) {
 }
 
 
+/**
+ * Fourth form step:
+ * Settings for open graph. Not testet yet, because open graph is not yet
+ * imported to backdrop.
+ */
 function wordpress_import_form_og($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
@@ -740,12 +774,19 @@ function wordpress_import_form_og($form, &$form_state) {
 }
 
 
+/**
+ * Submit handler for the open graph settings form.
+ */
 function wordpress_import_form_og_submit(&$form, &$form_state) {
   $form_state['wordpress_import_obj']->og_groups = $form_state['values']['og_nodeapi']['visible']['og_groups'];
   $form_state['wordpress_import_obj']->og_public = $form_state['values']['og_nodeapi']['og_public'];
 }
 
 
+/**
+ * Form step five:
+ *   Form for mapping imported user to existing user.
+ */
 function wordpress_import_form_mapusers($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
@@ -797,6 +838,9 @@ function wordpress_import_form_mapusers($form, &$form_state) {
 }
 
 
+/**
+ * Validation for form step five.
+ */
 function wordpress_import_form_mapusers_validate(&$form, &$form_state) {
 
   if ($form_state['clicked_button']['#wizard type'] == 'cancel') {
@@ -822,6 +866,9 @@ function wordpress_import_form_mapusers_validate(&$form, &$form_state) {
 }
 
 
+/**
+ * Submit handler for form step five.
+ */
 function wordpress_import_form_mapusers_submit(&$form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
@@ -836,6 +883,10 @@ function wordpress_import_form_mapusers_submit(&$form, &$form_state) {
 }
 
 
+/**
+ * Form step six.
+ * Form to create new user(s) if no mapping is wished.
+ */
 function wordpress_import_form_newusers($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
 
@@ -863,6 +914,9 @@ function wordpress_import_form_newusers($form, &$form_state) {
 }
 
 
+/**
+ * Validation for form step six.
+ */
 function wordpress_import_form_newusers_validate(&$form, &$form_state) {
 
   if ($form_state['clicked_button']['#wizard type'] == 'cancel') {
@@ -900,17 +954,19 @@ function wordpress_import_form_newusers_validate(&$form, &$form_state) {
 }
 
 
+/**
+ * Submit handler for form step six.
+ */
 function wordpress_import_form_newusers_submit(&$form, &$form_state) {
   $form_state['wordpress_import_obj']->newuser = $form_state['values']['newuser'];
 }
 
 
+/**
+ * The finish form. Lst form step.
+ */
 function wordpress_import_form_ready($form, &$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
-
-  if (function_exists('dpm')) {
-    dpm($wordpress_import);
-  }
 
   $form['informations'] = array(
    '#value' => t('Wordpress Import configuration is complete. Click "Finish" to launch the import process.'),
@@ -922,13 +978,22 @@ function wordpress_import_form_ready($form, &$form_state) {
 
 /* ---------------- Form callback functions ---------------- */
 
+/**
+ * The callback function when the next button of a form step is clicked.
+ *
+ * @param  array &$form_state The stored values of the current form step.
+ */
 function wordpress_import_form_subtask_next(&$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
-  // $cache = ctools_object_cache_set('wordpress_import', $form_state['cache name'], $wordpress_import);
   $cache = wordpress_import_form_set_page_cache($form_state['cache name'], $wordpress_import);
 }
 
 
+/**
+ * The callback function when the cancel button of a form step is clicked.
+ *
+ * @param  array &$form_state The stored values of the current form step.
+ */
 function wordpress_import_form_subtask_cancel(&$form_state) {
   // ctools_object_cache_clear('wordpress_import', $form_state['cache name']);
   wordpress_import_form_clear_page_cache($form_state['cache name']);
@@ -938,6 +1003,11 @@ function wordpress_import_form_subtask_cancel(&$form_state) {
 }
 
 
+/**
+ * The callback function when the finish button of the last form step is clicked.
+ *
+ * @param  array &$form_state The stored values of the current form step.
+ */
 function wordpress_import_form_subtask_finish(&$form_state) {
   $wordpress_import = &$form_state['wordpress_import_obj'];
   wordpress_import_form_clear_page_cache($form_state['cache name']);
@@ -1590,6 +1660,7 @@ dpm($context['sandbox']['usermap'][$post['author']]);
   wordpress_import_db_set($wordpress_import->import_id , $context['results']['created_items']);
 }
 
+
 /**
  * Process post link into node path
  */
@@ -1803,6 +1874,7 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
   }
 }
 
+
 /**
  * Batch wrap-up function, displays import process results
  */
@@ -1959,7 +2031,13 @@ function wordpress_import_get_terms($vid) {
 }
 
 
-
+/**
+ * Create a redirect for a node
+ * @param  object  $node      The node object.
+ * @param  string  $path      The redirect path.
+ * @param  array   &$context  the batch context array.
+ * @param  boolean $with_lang Indicator if the redirect has a language context.
+ */
 function wordpress_import_create_redirect($node, $path, &$context, $with_lang = TRUE) {
   $redirect = new Redirect();
   if ($with_lang) {
@@ -1978,6 +2056,15 @@ function wordpress_import_create_redirect($node, $path, &$context, $with_lang = 
   }
 }
 
+
+/**
+ * Create a menu link for a node.
+ * @param  object  $node      The node bject.
+ * @param  string  $menu_name The menu name the link is stored to.
+ * @param  array   &$context  The batch context array.
+ * @param  boolean $expanded  Not use. Menu expanded yes/no.
+ * @param  array   $options   An array with options e.g. the language for the menu link.
+ */
 function wordpress_import_create_menu_link($node, $menu_name, &$context, $expanded = FALSE, $options = array()) {
   $item = array(
     'link_path' => 'node/' . $node->nid,
@@ -1992,6 +2079,10 @@ function wordpress_import_create_menu_link($node, $menu_name, &$context, $expand
   }
 }
 
+
+/**
+ * The form for the rollback.
+ */
 function wordpress_rollback_form($form, &$form_state) {
 
   $result = db_select('wordpress_import', 'w')
@@ -2016,6 +2107,9 @@ function wordpress_rollback_form($form, &$form_state) {
 }
 
 
+/**
+ * Submit handler for the rollback form.
+ */
 function wordpress_rollback_form_submit($form, &$form_state) {
   $selected_rollback = $form_state['values']['rollback_select'];
 
@@ -2028,6 +2122,9 @@ function wordpress_rollback_form_submit($form, &$form_state) {
 }
 
 
+/**
+ * The edit form for rollbacks.
+ */
 function wordpress_rollback_edit_form($form, &$form_state) {
 
   $result = db_select('wordpress_import', 'w')
@@ -2053,6 +2150,9 @@ function wordpress_rollback_edit_form($form, &$form_state) {
 }
 
 
+/**
+ * Submit handler for the rollback edit form.
+ */
 function wordpress_rollback_edit_form_submit($form, &$form_state) {
   $selected_rollback = $form_state['values']['rollback_delete_select'];
 
@@ -2074,7 +2174,6 @@ function wordpress_rollback_edit_form_submit($form, &$form_state) {
 
 /**
  * Process the rollback of the import in a batch.
- * @return [type] [description]
  */
 function wordpress_import_rollback($rollback_id) {
 
@@ -2111,6 +2210,13 @@ function wordpress_import_rollback($rollback_id) {
   batch_process('/admin/content/wordpress_import');
 }
 
+
+/**
+ * Tha callback form for the rollback batch.
+ * @param  string $item_type The item type to be deleted.
+ * @param  string $item_id   The corresponding item id.
+ * @param  array  &$context  The batch context array.
+ */
 function wordpress_import_rollback_callback($item_type, $item_id, &$context) {
 
   $function = $item_type . '_delete';
@@ -2119,6 +2225,10 @@ function wordpress_import_rollback_callback($item_type, $item_id, &$context) {
   }
 }
 
+
+/**
+ * The finish callback for the rollback batch.
+ */
 function wordpress_import_rollback_finished($success, $results, $operations) {
   if ($success) {
     backdrop_set_message('Rollback successful');
@@ -2174,6 +2284,10 @@ function wordpress_import_curl_redir_url($ch) {
 }
 
 
+/**
+ * [wordpress_import_file_directory_path description]
+ * @return string The public file path.
+ */
 function wordpress_import_file_directory_path() {
   return variable_get('file_public_path', conf_path() . '/files');
 }
@@ -2232,6 +2346,11 @@ function wordpress_import_db_create($identifier) {
 }
 
 
+/**
+ * Helper function to store rollback information
+ * @param  string $id    The import id.
+ * @param  array  $value The value to be stored.
+ */
 function wordpress_import_db_set($id, $value) {
   db_update('wordpress_import')
     ->fields(array('value' => serialize($value)))
@@ -2239,6 +2358,11 @@ function wordpress_import_db_set($id, $value) {
     ->execute();
 }
 
+/**
+ * Helper function to get a stored rollback.
+ * @param  string $id The import id.
+ * @return array      An array with the imported items.
+ */
 function wordpress_import_db_get($id) {
   $data = db_query('SELECT * FROM {wordpress_import} WHERE iid = :id', array(':id' => $id))->fetchObject();
   if ($data) {
@@ -2247,6 +2371,10 @@ function wordpress_import_db_get($id) {
   return $data;
 }
 
+/**
+ * Helper function to clear a stored rollback
+ * @param  string $id The import id.
+ */
 function wordpress_import_db_clear($id) {
   db_delete('wordpress_import')
     ->condition('iid', ($id), 'IN')
