@@ -418,6 +418,14 @@ function wordpress_import_form_options($form, &$form_state) {
     '#options' => $content_formats,
     );
 
+  $form['basic_options']['comments_format'] = array(
+    '#type' => 'select',
+    '#title' => t('Comments text format'),
+    '#description' => t('Select the input format to use for imported comments.'),
+    '#default_value' => '',
+    '#options' => $content_formats,
+  );
+
   $form['basic_options']['create_menu_items_page'] = array(
     '#type' => 'checkbox',
     '#title' => t('Create menu items for imported pages?'),
@@ -1470,7 +1478,7 @@ dpm($context['sandbox']['usermap'][$post['author']]);
     // load the node and add the comments
     $temp_node = node_load($node_exist);
     if (module_exists('comment') && !empty($post['comments'])) {
-      wordpress_import_process_post_comments($post['comments'], $temp_node->nid, $wordpress_import->options['disable_trackbacks'], $context);
+      wordpress_import_process_post_comments($post['comments'], $temp_node->nid, $wordpress_import, $context);
     }
     node_save($temp_node);
     return;
@@ -1531,7 +1539,7 @@ dpm($context['sandbox']['usermap'][$post['author']]);
 
   // Process comments and trackbacks for this post
   if (module_exists('comment') && !empty($post['comments'])) {
-    wordpress_import_process_post_comments($post['comments'], $node->nid, $wordpress_import->options['disable_trackbacks'], $context);
+    wordpress_import_process_post_comments($post['comments'], $node->nid, $wordpress_import, $context);
   }
 
   // create the translated nodes
@@ -1685,7 +1693,7 @@ function wordpress_import_process_post_link($link, $baseurl) {
 /**
  * Process comments and trackbacks for this post
  */
-function wordpress_import_process_post_comments($comments, $nid, $disable_trackbacks, &$context) {
+function wordpress_import_process_post_comments($comments, $nid, $wordpress_import, &$context) {
 
   $node_duplicate = $context['sandbox']['node_duplicate'];
 
@@ -1708,7 +1716,7 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
 
     switch ($comment['type']) {
       case 'trackback':
-        if (module_exists('trackback') && !$disable_trackbacks) {
+        if (module_exists('trackback') && !$wordpress_import->options['disable_trackbacks']) {
           $node_trackback = array(
             'nid' => $nid,
             'created' => strtotime($comment['date']),
@@ -1744,11 +1752,12 @@ function wordpress_import_process_post_comments($comments, $nid, $disable_trackb
           'changed' => strtotime($comment['date']),
           'hostname' => $comment['author_IP'],
           'status' => $status,
-          'format' => $wordpress_import->format,
+          'format' => $wordpress_import->options['comments_format'],
         );
 
         $node_comment = entity_create('comment', $nc);
         $node_comment->comment_body[LANGUAGE_NONE][0]['value'] = $comment['content'];
+        $node_comment->comment_body[LANGUAGE_NONE][0]['format'] = $wordpress_import->options['comments_format'];
 
         // Check if duplicate
         if ($node_duplicate) {
