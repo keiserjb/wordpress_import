@@ -1395,7 +1395,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   if ($node->type == 'noimport') {
     return;
   }
-dpm($context['sandbox']['usermap'][$post['author']]);
+
   // Node uid (return if we don't want this author)
   $node->uid = $context['sandbox']['usermap'][$post['author']];
   if ($node->uid == 'noimport' || !ctype_digit($node->uid)) {
@@ -1893,10 +1893,6 @@ function wordpress_import_batch_finished($success, $results, $operations) {
     $msg_results[] = '<li>' . t('@downloaded_images/@total_images images', array('@downloaded_images' => count($results['downloaded_images']), '@total_images' => count($results['downloaded_images'])+count($results['error_images']))) . '</li>';
 
     backdrop_set_message($message . '<ul>' . join("\n", $msg_results) . '</ul>');
-
-    if (function_exists('dpm')) {
-      // dpm($results['error_images']);
-    }
 
     if (count($results['error_images']) > 0) {
 
