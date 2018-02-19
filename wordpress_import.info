@@ -1,6 +1,6 @@
-name = Wordpress import
-description = "Import WXR files created by Wordpress blog tool."
-package = "Wordpress Import"
+name = WordPress import
+description = "Import WXR files created by WordPress blog tool."
+package = "WordPress Import"
 dependencies[] = form_wizard
 type = module
 backdrop = "1.x"

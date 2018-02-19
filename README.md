@@ -1,4 +1,4 @@
-Wordpress Import
+WordPress Import
 ================
 
 This Drupal module imports a WordPress blog from a WordPress eXtended RSS (WXR)
@@ -11,7 +11,7 @@ Installation
 - Install this module using the official Backdrop CMS instructions at
   https://backdropcms.org/guide/modules
 
-- Visit the page under Administration > Content > Wordpress Import
+- Visit the page under Administration > Content > WordPress Import
   and follow the steps.
 
 Dependencies
