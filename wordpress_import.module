@@ -1830,7 +1830,7 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
 
         // Check if image was already downloaded
         foreach ($context['results']['downloaded_images'] as $img) {
-          if ($img['imgurl'] == $imgurl) {
+          if (!empty($img['imgurl']) && $img['imgurl'] == $imgurl) {
             $body = str_replace($imgurl, $img['newurl'], $body);
             continue 2;
           }
@@ -1856,6 +1856,9 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
             curl_exec($ch);
             curl_close($ch);
             fclose($imgout);
+          }
+          else {
+            $imgfile = '';
           }
 
           $rel_dir = str_replace('.', '', $images_dir);
