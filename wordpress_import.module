@@ -641,7 +641,6 @@ function wordpress_import_form_map_taxonomies($form, &$form_state) {
   $nodetype_post_taxonomy = array('noimport' => 'Do not import');
   $nodetype_page_taxonomy = array('noimport' => 'Do not import');
 
-
   foreach ($nodetype_post_fields as $field_name => $value) {
     $field_info = field_info_field($field_name);
     if (isset($field_info['type']) && ($field_info['type'] == 'taxonomy_term_reference')) {
@@ -1070,7 +1069,7 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
       }
 
     }
-    elseif ($wordpress_import->options['usermap_type'] == 'manual' && count($wordpress_import->newuser) > 0) {
+    elseif ($wordpress_import->options['usermap_type'] == 'manual' && count($wordpress_import->newuser) > 0) {
 
       // Create new Backdrop users as required and assign uid to corresponding
       // WordPress author.
