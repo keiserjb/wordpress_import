@@ -1390,6 +1390,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
   if ($node->type == 'noimport') {
     return;
   }
+
   // Node uid (return if we don't want this author)
   $node->uid = $context['sandbox']['usermap'][$post['author']];
   if ($node->uid == 'noimport' || !ctype_digit($node->uid)) {
