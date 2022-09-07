@@ -34,7 +34,8 @@ Please see https://github.com/bjoern-st/wordpress_import/wiki/Documentation
 Current Maintainers
 -------------------
 
-- Bjoern (https://github.com/bjoern-st)
+- [Bjoern](https://github.com/bjoern-st)
+- [Laryn Kragt Bakker](https://github.com/laryn), [CEDC.org](https://CEDC.org)
 
 Credits
 -------
