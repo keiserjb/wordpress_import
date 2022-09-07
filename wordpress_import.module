@@ -530,7 +530,7 @@ function wordpress_import_form_options($form, &$form_state) {
 
   // Warn if some key modules are not found
   if (!module_exists('taxonomy')) {
-      backdrop_set_message(t('Could not find module "path". <strong>Categories and tags will not be imported.</strong>'), 'error');
+      backdrop_set_message(t('Could not find module "taxonomy". <strong>Categories and tags will not be imported.</strong>'), 'error');
       $form['advanced_options']['disable_categories']['#default_value'] = TRUE;
       $form['advanced_options']['disable_categories']['#disabled'] = TRUE;
       $form['advanced_options']['#collapsed'] = FALSE;
@@ -1182,26 +1182,21 @@ function wordpress_import_process_blog($wordpress_import, &$context) {
  * Import categories and tags as taxonomy terms
  */
 function wordpress_import_process_categories_tags(&$wordpress_import, &$context) {
-
   if (!empty($wordpress_import->data['categories'])) {
-
     $wordpress_import->categories_vocabulary = $wordpress_import->options['nodetype_post_tm']['category_vocabulary'];
     $wordpress_import->categories_map = wordpress_import_get_terms($wordpress_import->options['nodetype_post_tm']['category_vocabulary']);
-
     foreach ($wordpress_import->data['categories'] as $category) {
-
       // Create term if it doesn't exist
-      if (empty($wordpress_import->categories_map[$category['cat_name']])) {
+      if (empty($wordpress_import->categories_map[$category])) {
         $term = new TaxonomyTerm();
-        $term->name = $category['cat_name'];
-        $term->description = $category['category_description'];
+        $term->name = $category;
+        $term->description = '';
         $term->vocabulary = $wordpress_import->options['nodetype_post_tm']['category_vocabulary'];
         $term->parent = 0;
 
         if (!empty($category['category_parent']) && !empty($wordpress_import->categories_map[$category['category_parent']])) {
           $term->parent = $wordpress_import->categories_map[$category['category_parent']];
         }
-
         taxonomy_term_save($term);
         $context['results']['created_items'][] = array('taxonomy_term' => $term->tid);
 
@@ -1497,9 +1492,7 @@ function wordpress_import_process_post(&$wordpress_import, &$context) {
 
     $node->path = $path;
   }
-
   if (module_exists('taxonomy')) {
-    // @todo: find out, why categories_map and tags_map dissapear from $wordpress_import
     if ($node->type == $wordpress_import->options['nodetype_post']) {
       if ($wordpress_import->options['nodetype_post_tm']['category_fieldname'] != 'noimport') {
         // get the category term id and add it to the node
@@ -1976,13 +1969,11 @@ function wordpress_import_read_wxr(&$wordpress_import) {
       }
 
       // Read categories data
-      if ($reader->name == 'wp:category') {
+      if ($reader->name == 'category') {
         $domCategory = $reader->expand();
-        $wordpress_import->data['categories'][] = array();
         foreach ($domCategory->childNodes as $node) {
-          $wordpress_import->data['categories'][key($wordpress_import->data['categories'])][substr($node->nodeName, 3)] = $node->nodeValue;
+          $wordpress_import->data['categories'][$node->nodeValue] = $node->nodeValue;
         }
-        next($wordpress_import->data['categories']);
         $wordpress_import->count['categories']++;
       }
 
@@ -2027,15 +2018,14 @@ function wordpress_import_read_wxr(&$wordpress_import) {
 /**
  * Return an array of taxonomy terms belonging to a vocabulary
  */
-function wordpress_import_get_terms($vid) {
-  $db_result = db_query('SELECT t.tid, t.name FROM {taxonomy_term_data} t WHERE t.vocabulary = :vid', array(':vid' => $vid))->fetchAll();
-
-  $result = array();
-  foreach ($db_result as $term) {
-    $result[$term->name] = $term->tid;
+function wordpress_import_get_terms($vocabulary) {
+  $terms = taxonomy_get_tree($vocabulary);
+  $term_map = array();
+  foreach ($terms as $term) {
+    $term_map[$term->name] = $term->tid;
   }
 
-  return $result;
+  return $term_map;
 }
 
 
