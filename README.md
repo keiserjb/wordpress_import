@@ -1,50 +1,42 @@
-WordPress Import
-================
+# WordPress Import
 
-This Drupal module imports a WordPress blog from a WordPress eXtended RSS (WXR)
-format file.
+Import a WordPress blog from a WordPress eXtended RSS (WXR) format file.
 
-
-Installation
-------------
+## Installation
 
 - Install this module using the official Backdrop CMS instructions at
   https://backdropcms.org/guide/modules
-
-- Visit the page under Administration > Content > WordPress Import
+- Visit the page under **Administration > Content > WordPress Import**
   and follow the steps.
 
-Dependencies
-------------
+## Dependencies
 
-Form Wizard for multistep forms.
-See https://backdropcms.org/project/form_wizard
+ - [Form Wizard](https://backdropcms.org/project/form_wizard) for multistep
+   forms.
 
+## Documentation
 
-Documentation
--------------
+More details may be found (or added) in the
+[Wiki](https://github.com/backdrop-contrib/wordpress_import/issues)
 
-Additional documentation is located in the Wiki: https://github.com/bjoern-st/wordpress_import/wiki/Documentation
+## Issues
 
-Issues
-------
+Bugs and Feature requests should be reported in the
+[Issue Queue](https://github.com/backdrop-contrib/wordpress_import/issues)
 
-Please see https://github.com/bjoern-st/wordpress_import/wiki/Documentation
-
-Current Maintainers
--------------------
+## Current Maintainers
 
 - [Bjoern](https://github.com/bjoern-st)
 - [Laryn Kragt Bakker](https://github.com/laryn), [CEDC.org](https://CEDC.org)
 
-Credits
--------
+## Credits
 
- - Originally written for Drupal by Jerome Charaoui, aka lavamind (http://www.koumbit.org/)
- - Originally written for Drupal by Yann Rocq (http://www.rocq.net/yann/)
+ - Ported to Backdrop by [Bjoern](https://github.com/bjoern-st).
+ - Originally written for Drupal by
+   [Jerome Charaoui/lavamind](http://www.koumbit.org/)
+   and [Yann Rocq](http://www.rocq.net/yann/).
 
-License
--------
+## License
 
 This project is GPL v2 software. See the LICENSE.txt file in this directory for
 complete text.
