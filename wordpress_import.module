@@ -49,8 +49,8 @@ function wordpress_import_menu() {
 function wordpress_import_permission() {
   return array(
     'import wordpress blog' => array(
-      'title' => t('Import wordpress blog'),
-      'description' => t('Permission to import a wordpress blog.'),
+      'title' => t('Import WordPress blog'),
+      'description' => t('Permission to import a WordPress blog.'),
     ),
   );
 }
