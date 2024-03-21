@@ -49,8 +49,8 @@ function wordpress_import_menu() {
 function wordpress_import_permission() {
   return array(
     'import wordpress blog' => array(
-      'title' => t('Import WordPress blog'),
-      'description' => t('Permission to import a WordPress blog.'),
+      'title' => t('Import wordpress blog'),
+      'description' => t('Permission to import a wordpress blog.'),
     ),
   );
 }
@@ -1668,15 +1668,13 @@ function wordpress_import_process_post_link($link, $baseurl) {
  * Process comments and trackbacks for this post
  */
 function wordpress_import_process_post_comments($comments, $nid, $wordpress_import, &$context) {
-
   $node_duplicate = $context['sandbox']['node_duplicate'];
 
-  $node_trackbacks = array();
-  $node_comments = array();
+  $node_trackbacks = [];
+  $node_comments = [];
   $comment_id = 0;
 
   foreach ($comments as $comment) {
-
     switch ($comment['approved']) {
       case '0':
         $status = COMMENT_NOT_PUBLISHED;
@@ -1691,7 +1689,7 @@ function wordpress_import_process_post_comments($comments, $nid, $wordpress_impo
     switch ($comment['type']) {
       case 'trackback':
         if (module_exists('trackback') && !$wordpress_import->options['disable_trackbacks']) {
-          $node_trackback = array(
+          $node_trackback = [
             'nid' => $nid,
             'created' => strtotime($comment['date']),
             'changed' => strtotime($comment['date']),
@@ -1701,7 +1699,7 @@ function wordpress_import_process_post_comments($comments, $nid, $wordpress_impo
             'url' => $comment['author_url'],
             'excerpt' => $comment['content'],
             'status' => 1
-            );
+          ];
           // Check if duplicate.
           if ($node_duplicate) {
             $tr = db_query("SELECT tr.trid FROM {trackback_received} tr WHERE tr.nid = %d AND tr.created = %d", $node_duplicate->nid, $node_trackback['created']);
@@ -1715,7 +1713,7 @@ function wordpress_import_process_post_comments($comments, $nid, $wordpress_impo
         }
         break;
       default:
-        $nc = array(
+        $nc = [
           'nid' => $nid,
           'pid' => 0,
           'subject' => trim(truncate_utf8(decode_entities(strip_tags($comment['content'])), 29, TRUE)),
@@ -1727,7 +1725,7 @@ function wordpress_import_process_post_comments($comments, $nid, $wordpress_impo
           'hostname' => $comment['author_IP'],
           'status' => $status,
           'format' => $wordpress_import->options['comments_format'],
-        );
+        ];
 
         $node_comment = entity_create('comment', $nc);
         $node_comment->comment_body[LANGUAGE_NONE][0]['value'] = $comment['content'];
@@ -1762,7 +1760,7 @@ function wordpress_import_process_post_comments($comments, $nid, $wordpress_impo
       $node_trackback['url'],
       $node_trackback['excerpt'],
       $node_trackback['status']
-      );
+    );
     $context['results']['created_trackbacks']++;
   }
 
@@ -1770,23 +1768,39 @@ function wordpress_import_process_post_comments($comments, $nid, $wordpress_impo
   foreach ($node_comments as $node_comment) {
     $comment_id = comment_save($node_comment);
     if ($comment_id) {
-      $context['results']['created_items'][] = array('comment' => $comment_id);
+      $context['results']['created_items'][] = ['comment' => $comment_id];
     }
-    // Update fields that haven't been set by comment_save.
-    db_query("UPDATE {comment} SET hostname= '@hn', created= @ts, status= @st WHERE cid= @id", array(
-      '@hn' => $node_comment->hostname,
-      '@st' => $node_comment->status,
-      '@id' => $comment_id
-      )
-      );
-    $context['results']['created_comments']++;
+    // Ensure that all variables are set and not null.
+    if (isset($node_comment->hostname, $node_comment->created, $node_comment->status, $comment_id)) {
+      // Prepare the query with placeholders.
+      $query = "UPDATE {comment} SET hostname= :hn, created= :ts, status= :st WHERE cid= :id";
+      $args = [
+        ':hn' => $node_comment->hostname,
+        ':ts' => $node_comment->created,
+        ':st' => $node_comment->status,
+        ':id' => $comment_id,
+      ];
+
+      // Execute the query.
+      try {
+        db_query($query, $args);
+      }
+      catch (Exception $e) {
+        watchdog('wordpress_import', 'Failed to update comment: @error', ['@error' => $e->getMessage()], WATCHDOG_ERROR);
+        // Optionally, handle the error, e.g., by skipping this comment or taking corrective action.
+      }
+    }
+    else {
+      watchdog('wordpress_import', 'Skipping comment update due to missing data', [], WATCHDOG_WARNING);
+      // Handle missing data as appropriate for your application.
+    }
   }
 }
 
 /**
  * Process node body and download image content
  */
-function wordpress_import_process_post_images(&$body, $images_dir, $context) {
+function wordpress_import_process_post_images(&$body, $images_dir, &$context) {
   global $base_path;
 
   // Find image URL in content.
@@ -1802,62 +1816,57 @@ function wordpress_import_process_post_images(&$body, $images_dir, $context) {
         (strcasecmp($imginfo['extension'], 'gif') == 0) ||
         (strcasecmp($imginfo['extension'], 'png') == 0)) {
 
+        // Check if the image URL exists and is accessible
         $ch = curl_init($imgurl);
-
-        // Check if cURL object OK.
-        if (!$ch) {
-          $context['sandbox']['error_images'][] = array('oldurl' => $imgurl);
-          continue;
-        }
-
-        // Check if image was already downloaded.
-        foreach ($context['results']['downloaded_images'] as $img) {
-          if (!empty($img['imgurl']) && $img['imgurl'] == $imgurl) {
-            $body = str_replace($imgurl, $img['newurl'], $body);
-            continue 2;
-          }
-        }
-
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-
-        // Obtain new URL in case of redirections.
-        $imgnewurl = wordpress_import_curl_redir_url($ch);
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+        curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($imgnewurl) {
-
+        if ($code == 200) { // HTTP status code 200 means the request was successful
           // Download image if it does not exist.
           $new_file_name = $images_dir . '/' . $imginfo['basename'];
           if (!file_exists($new_file_name)) {
-            $imgfile = file_create_filename(urldecode($imginfo['basename']), $images_dir);
-            $imgout = fopen($imgfile, 'wb');
-            $ch = curl_init($imgnewurl);
-            curl_setopt($ch, CURLOPT_HEADER, FALSE);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_FILE, $imgout);
-            curl_exec($ch);
-            curl_close($ch);
-            fclose($imgout);
+            $file_contents = file_get_contents($imgurl);
+            if ($file_contents !== FALSE) {
+              $file = file_save_data($file_contents, "public://{$images_dir}/" . $imginfo['basename'], FILE_EXISTS_RENAME);
+              if ($file) {
+                // Assign the file as permanent to prevent it from being deleted automatically.
+                $file->status = FILE_STATUS_PERMANENT;
+                file_save($file);
+
+                // Replace the old URL with the new local URL in the post content
+                $newurl = file_create_url($file->uri);
+                $body = str_replace($imgurl, $newurl, $body);
+
+                // Assuming you have the node ID available here
+                if (isset($context['sandbox']['nid']) && !empty($context['sandbox']['nid'])) {
+                  $nid = $context['sandbox']['nid'];
+                  file_usage_add($file, 'wordpress_import', 'node', $nid);
+                } else {
+                  // If the node ID isn't available, handle the error accordingly
+                }
+
+                // Add to the downloaded images list for reporting or further processing
+                $context['sandbox']['downloaded_images'][] = array('oldurl' => $imgurl, 'newurl' => $newurl);
+              } else {
+                // Handle errors in saving the file
+                $context['sandbox']['error_images'][] = array('oldurl' => $imgurl, 'message' => 'Error saving the file.');
+              }
+            } else {
+              // Handle errors in getting the file contents
+              $context['sandbox']['error_images'][] = array('oldurl' => $imgurl, 'message' => 'Error downloading the image.');
+            }
           }
-          else {
-            $imgfile = '';
-          }
-
-          $rel_dir = str_replace('.', '', $images_dir);
-
-          $newurl = /* $base_path . */ $rel_dir . '/' . $imginfo['basename'];
-
-          // Replace image URL with new path in post.
-          $body = str_replace($imgurl, $newurl, $body);
-          $context['sandbox']['downloaded_images'][] = array('oldurl' => $imgurl, 'newurl' => $newurl, 'file' => $imgfile);
-        }
-        else {
-          $context['sandbox']['error_images'][] = array('oldurl' => $imgurl);
+        } else {
+          // Image URL is not accessible
+          $context['sandbox']['error_images'][] = array('oldurl' => $imgurl, 'message' => 'Image URL not accessible.');
         }
       }
     }
   }
 }
+
 
 
 /**
