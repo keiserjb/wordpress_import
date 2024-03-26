@@ -28,6 +28,7 @@ Bugs and Feature requests should be reported in the
 
 - [Bjoern](https://github.com/bjoern-st)
 - [Laryn Kragt Bakker](https://github.com/laryn), [CEDC.org](https://CEDC.org)
+- [Justin Keiser](https://github.com/keiserjb)
 
 ## Credits
 
