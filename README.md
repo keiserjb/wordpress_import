@@ -27,7 +27,8 @@ Bugs and Feature requests should be reported in the
 ## Current Maintainers
 
 - [Bjoern](https://github.com/bjoern-st)
-- [Laryn Kragt Bakker](https://github.com/laryn), [CEDC.org](https://CEDC.org)
+- [Laryn Kragt Bakker](https://github.com/laryn)
+- [Justin Keiser](https://github.com/keiserjb)
 
 ## Credits
 
